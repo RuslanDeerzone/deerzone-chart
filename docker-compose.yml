@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: deerzone
+      POSTGRES_PASSWORD: deerzone
+      POSTGRES_DB: deerzone
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  api:
+    build: ./api
+    environment:
+      DATABASE_URL: "postgresql+psycopg://deerzone:deerzone@db:5432/deerzone"
+      BOT_TOKEN: "8506782802:AAEDmd5vYxgJxkJobSKUU8-IgY6pDVXSLVQ"
+    depends_on:
+      - db
+    ports:
+      - "8000:8000"
+
+  web:
+    build: ./web
+    environment:
+      NEXT_PUBLIC_API_BASE: "/api"
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
