@@ -1,5 +1,5 @@
 $API_URL="https://melodious-courtesy-production-88f3.up.railway.app"
-$ADMIN_TOKEN="0894042745ruslanvoidashenko1992"
+$ADMIN_TOKEN="17750400RuslanGaripov19921209"
 
 Invoke-RestMethod `
   -Method POST `
