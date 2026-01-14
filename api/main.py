@@ -147,39 +147,110 @@ def require_admin(x_admin_token: Optional[str]):
 # iTunes Search (preview + cover)
 # =============================================================================
 
+import requests
+
 ITUNES_URL = "https://itunes.apple.com/search"
 
-def _clean_query(s: str) -> str:
-    s = re.sub(r"\s*\(.*?\)\s*", " ", s)  # убираем скобки (feat., ремиксы)
-    s = re.sub(r"\s+", " ", s).strip()
-    return s
+def itunes_lookup(artist: str, title: str):
+    q = f"{artist} {title}".strip()
+    params = {
+        "term": q,
+        "media": "music",
+        "entity": "song",
+        "limit": 5,
+    }
+    r = requests.get(ITUNES_URL, params=params, timeout=10)
+    r.raise_for_status()
+    data = r.json()
+    results = data.get("results", []) or []
+    return results
 
-def itunes_search_track(artist: str, title: str) -> Optional[dict]:
-    q = _clean_query(f"{artist} {title}")
-    try:
-        r = requests.get(
-            ITUNES_URL,
-            params={
-                "term": q,
-                "media": "music",
-                "entity": "song",
-                "limit": 1,
-            },
-            timeout=10,
-        )
-        r.raise_for_status()
-        data = r.json()
-        if data.get("resultCount", 0) < 1:
-            return None
-        return data["results"][0]
-    except Exception:
+def best_itunes_match(results: list, artist: str, title: str):
+    a = (artist or "").lower().strip()
+    t = (title or "").lower().strip()
+
+    def score(item):
+        ia = (item.get("artistName") or "").lower()
+        it = (item.get("trackName") or "").lower()
+        s = 0
+        if a and a in ia:
+            s += 2
+        if t and t in it:
+            s += 3
+        # бонус за точное совпадение по подстроке
+        if ia == a:
+            s += 1
+        if it == t:
+            s += 1
+        return s
+
+    results = sorted(results, key=score, reverse=True)
+    return results[0] if results else None
+
+def normalize_artwork(url: str, size: int = 600):
+    if not url:
         return None
+    # iTunes обычно даёт .../100x100bb.jpg → меняем на 600x600bb.jpg
+    return re.sub(r"/\d+x\d+bb\.", f"/{size}x{size}bb.", url)
 
-def itunes_pick_cover(artwork_url: Optional[str]) -> Optional[str]:
-    if not artwork_url:
-        return None
-    return artwork_url.replace("100x100bb.jpg", "600x600bb.jpg")
+def enrich_song_with_itunes(song):
+    # song может быть pydantic-моделью SongOut или dict
+    artist = getattr(song, "artist", None) if not isinstance(song, dict) else song.get("artist")
+    title = getattr(song, "title", None) if not isinstance(song, dict) else song.get("title")
 
+    results = itunes_lookup(artist or "", title or "")
+    best = best_itunes_match(results, artist or "", title or "")
+    if not best:
+        return False
+
+    cover = normalize_artwork(best.get("artworkUrl100") or best.get("artworkUrl60"))
+    preview = best.get("previewUrl")
+
+    # записываем только если нашли
+    if isinstance(song, dict):
+        if cover and not song.get("cover"):
+            song["cover"] = cover
+        if preview and not song.get("preview_url"):
+            song["preview_url"] = preview
+        song["source"] = song.get("source") or "itunes"
+    else:
+        if cover and not getattr(song, "cover", None):
+            setattr(song, "cover", cover)
+        if preview and not getattr(song, "preview_url", None):
+            setattr(song, "preview_url", preview)
+        if not getattr(song, "source", None):
+            setattr(song, "source", "itunes")
+
+    return True
+
+"/admin/weeks/current/enrich"
+def admin_enrich_current_week(
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    # проверка токена
+    if not x_admin_token or x_admin_token != ADMIN_TOKEN:
+        raise HTTPException(status_code=401, detail="UNAUTHORIZED")
+
+    week = get_current_week()
+    week_id = week["id"]
+
+    # ВАЖНО: используй именно тот контейнер песен, который у тебя реально хранит неделю.
+    # У тебя раньше было SONGS_BY_WEEK[week_id] — значит работаем с ним:
+    items = SONGS_BY_WEEK.get(week_id, [])
+
+    updated = 0
+    tried = 0
+    for s in items:
+        tried += 1
+        try:
+            changed = enrich_song_with_itunes(s)
+            if changed:
+                updated += 1
+        except Exception:
+            # не валим весь процесс из-за одной песни
+            continue
+
+    return {"week_id": week_id, "tried": tried, "updated": updated}
 
 # =============================================================================
 # Endpoints
