@@ -207,10 +207,13 @@ def user_id_from_telegram_init_data(init_data: Optional[str]) -> str:
 # =============================================================================
 
 def require_admin(x_admin_token: Optional[str]):
-    token = os.environ.get("ADMIN_TOKEN")
-    if not token:
-        raise HTTPException(status_code=500, detail="ADMIN_TOKEN is not set")
-    if x_admin_token != token:
+    if not ADMIN_TOKEN:
+        raise HTTPException(status_code=500, detail="ADMIN_TOKEN is not set on server")
+
+    got = (x_admin_token or "").strip()
+    exp = ADMIN_TOKEN.strip()
+
+    if got != exp:
         raise HTTPException(status_code=401, detail="UNAUTHORIZED")
 
 
