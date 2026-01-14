@@ -8,15 +8,14 @@ from fastapi import FastAPI, Header, HTTPException, Body
 from pydantic import BaseModel
 
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
 app = FastAPI()
+
+from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"^https://.*\.up\.railway\.app$",
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
