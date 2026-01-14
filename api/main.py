@@ -1,170 +1,188 @@
 from __future__ import annotations
 
 import os
+import re
 import time
-import hashlib
-from typing import Optional, Literal, List, Dict
+from typing import Dict, List, Optional, Literal
 
-from fastapi import FastAPI, Header, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+import requests
+from fastapi import FastAPI, Header, HTTPException, Body
 from pydantic import BaseModel, Field
 
-
-# -----------------------------------------------------------------------------
-# CONFIG
-# -----------------------------------------------------------------------------
-
-APP_NAME = "#deerzone chart API"
-
-# Если DEV_ALLOW_NO_TELEGRAM=1 — разрешаем работать без initData (удобно для тестов)
-DEV_ALLOW_NO_TELEGRAM = os.getenv("DEV_ALLOW_NO_TELEGRAM", "1") == "1"
-
-# Токен бота не обязателен для запуска этой версии API.
-# (Позже, когда будем делать нормальную проверку initData — пригодится)
-BOT_TOKEN = os.getenv("BOT_TOKEN")  # может быть None
+app = FastAPI(title="deerzone-chart-api")
 
 
-# -----------------------------------------------------------------------------
-# DATA MODELS
-# -----------------------------------------------------------------------------
+# =========================
+# Models
+# =========================
 
 class WeekOut(BaseModel):
     id: int
     title: str
-    status: Literal["open", "closed"]
+    status: Literal["open", "closed"] = "open"
 
 
 class SongOut(BaseModel):
     id: int
-    artist: str
     title: str
+    artist: str
     is_new: bool = False
-    weeks_in_chart: int = 1  # сколько недель в чарте (для твоего правила 10 недель)
+
+    # last fixes: covers + previews + fallback
+    cover: Optional[str] = None          # image url
+    preview_url: Optional[str] = None    # 30s audio preview url
+    youtube_url: Optional[str] = None    # fallback open link
+    source: str = "manual"
 
 
 class VoteIn(BaseModel):
-    song_ids: List[int] = Field(default_factory=list, description="Список ID песен (можно 1..N)")
+    song_ids: List[int] = Field(default_factory=list)
 
 
 class VoteOut(BaseModel):
     ok: bool
     week_id: int
-    user_id: str
+    user_id: int
     voted_song_ids: List[int]
 
 
-# -----------------------------------------------------------------------------
-# IN-MEMORY STORAGE (простая и надёжная база для старта)
-# -----------------------------------------------------------------------------
+# =========================
+# In-memory storage
+# =========================
 
-# Текущая неделя. Ты писал "Week 1 - 2026". У тебя сейчас в ответе API был week_id=3.
-# Чтобы не ломать фронт — оставляем id=3, title=Week 1 - 2026, status=open
 CURRENT_WEEK = WeekOut(id=3, title="Week 1 - 2026", status="open")
 
-# Песни недели (35 штук: 10 + 25)
-# ID делаем стабильными, чтобы голосование работало.
-SONGS_BY_WEEK: Dict[int, List[SongOut]] = {
-    3: [
-        # --- Top-10 (carry over) ---
-        SongOut(id=1, artist="EXO", title="I'm Home", is_new=False, weeks_in_chart=3),
-        SongOut(id=2, artist="MINHO (SHINee)", title="TEMPO", is_new=False, weeks_in_chart=3),
-        SongOut(id=3, artist="Stray Kids", title="Do It", is_new=False, weeks_in_chart=7),
-        SongOut(id=4, artist="ITZY", title="TUNNEL VISION", is_new=False, weeks_in_chart=8),
-        SongOut(id=5, artist="Stray Kids", title="DIVINE", is_new=False, weeks_in_chart=6),
-        SongOut(id=6, artist="BABYMONSTER", title="PSYCHO", is_new=False, weeks_in_chart=5),
-        SongOut(id=7, artist="Bang Chan (Stray Kids)", title="Roman Empire", is_new=False, weeks_in_chart=9),
-        SongOut(id=8, artist="ALLDAY PROJECT", title="LOOK AT ME", is_new=False, weeks_in_chart=4),
-        SongOut(id=9, artist="ILLIT", title="NOT CUTE ANYMORE", is_new=False, weeks_in_chart=6),
-        SongOut(id=10, artist="Seonghwa (ATEEZ)", title="Skin", is_new=True, weeks_in_chart=1),
+# week_id -> list[SongOut]
+SONGS_BY_WEEK: Dict[int, List[SongOut]] = {}
 
-        # --- New entries (25) ---
-        SongOut(id=11, artist="Re:Hearts", title="Persona", is_new=True, weeks_in_chart=1),
-        SongOut(id=12, artist="Apink", title="Love Me More", is_new=True, weeks_in_chart=1),
-        SongOut(id=13, artist="JOOHONEY (MONSTA X)", title="STING", is_new=True, weeks_in_chart=1),
-        SongOut(id=14, artist="idntt", title="Pretty Boy Swag", is_new=True, weeks_in_chart=1),
-        SongOut(id=15, artist="H1-KEY", title="The World Isn’t Like a Movie", is_new=True, weeks_in_chart=1),
-        SongOut(id=16, artist="1MILLION", title="AT US", is_new=True, weeks_in_chart=1),
-        SongOut(id=17, artist="CNBLUE", title="Killer Joy", is_new=True, weeks_in_chart=1),
-        SongOut(id=18, artist="CHUU", title="XO, My Cyberlove", is_new=True, weeks_in_chart=1),
-        SongOut(id=19, artist="BADA", title="Our Loud Goodby", is_new=True, weeks_in_chart=1),
-        SongOut(id=20, artist="Shin Soohyun (UKISS)", title="Gray", is_new=True, weeks_in_chart=1),
-        SongOut(id=21, artist="DynamicDuo", title="Watch It, Feel It (feat. Sunghoon of ENHYPEN)", is_new=True, weeks_in_chart=1),
-        SongOut(id=22, artist="JIMIN", title="0108", is_new=True, weeks_in_chart=1),
-        SongOut(id=23, artist="WAKER", title="LiKE THAT", is_new=True, weeks_in_chart=1),
-        SongOut(id=24, artist="LATENCY", title="it was love", is_new=True, weeks_in_chart=1),
-        SongOut(id=25, artist="ZICO X Crush", title="Yin and Yang | SMTM12 - PRODUCER CYPHER", is_new=True, weeks_in_chart=1),
-        SongOut(id=26, artist="GRAY X Loco", title="PAPER | SMTM12 - PRODUCER CYPHER", is_new=True, weeks_in_chart=1),
-        SongOut(id=27, artist="J-Tong X Hukky Shibaseki", title="Cockroaches | SMTM12 - PRODUCER CYPHER", is_new=True, weeks_in_chart=1),
-        SongOut(id=28, artist="Lil Moshpit X Jay Park", title="GOAT | SMTM12 - PRODUCER CYPHER", is_new=True, weeks_in_chart=1),
-        SongOut(id=29, artist="DIA (AWU)", title="Dance!", is_new=True, weeks_in_chart=1),
-        SongOut(id=30, artist="ZEROBASONE", title="Running to Future", is_new=True, weeks_in_chart=1),
-        SongOut(id=31, artist="COMMA", title="Toxic Sugar", is_new=True, weeks_in_chart=1),
-        SongOut(id=32, artist="YOUNG POSSE × BENZO", title="LOSE YOUR SHXT", is_new=True, weeks_in_chart=1),
-        SongOut(id=33, artist="Park Gunwook (ZEROBASEONE)", title="Day After Day", is_new=True, weeks_in_chart=1),
-        SongOut(id=34, artist="HADES", title="Planet B", is_new=True, weeks_in_chart=1),
-        SongOut(id=35, artist="HA SUNG WOONG", title="Tell The World", is_new=True, weeks_in_chart=1),
-    ]
-}
-
-# Голоса: votes[week_id][song_id] = count
+# week_id -> {song_id: votes}
 VOTES: Dict[int, Dict[int, int]] = {}
 
-# Чтобы один человек не голосовал миллион раз: user_votes[week_id][user_id] = [song_ids]
-USER_VOTES: Dict[int, Dict[str, List[int]]] = {}
+# week_id -> {user_id: [song_ids]}
+USER_VOTES: Dict[int, Dict[int, List[int]]] = {}
+
+_song_id_seq = 1
 
 
-# -----------------------------------------------------------------------------
-# TELEGRAM AUTH (упрощённая)
-# -----------------------------------------------------------------------------
+def next_song_id() -> int:
+    global _song_id_seq
+    v = _song_id_seq
+    _song_id_seq += 1
+    return v
 
-def user_id_from_telegram_init_data(x_telegram_init_data: Optional[str]) -> str:
-    """
-    В боевом режиме тут делается проверка подписи initData (HMAC-SHA256) через BOT_TOKEN.
-    Сейчас делаем стабильный user_id:
-    - Если initData есть -> берём хэш строки
-    - Если нет -> dev-user (если разрешено DEV_ALLOW_NO_TELEGRAM)
-    """
-    if not x_telegram_init_data:
-        if DEV_ALLOW_NO_TELEGRAM:
-            return "dev-user"
-        raise HTTPException(status_code=401, detail="INIT_DATA_REQUIRED")
 
-    # стабильный короткий id по initData (без парсинга)
-    h = hashlib.sha256(x_telegram_init_data.encode("utf-8")).hexdigest()[:16]
-    return f"tg-{h}"
+def get_current_week() -> WeekOut:
+    return CURRENT_WEEK
 
 
 def ensure_week_exists(week_id: int) -> None:
     if week_id not in SONGS_BY_WEEK:
-        raise HTTPException(status_code=404, detail="WEEK_NOT_FOUND")
+        SONGS_BY_WEEK[week_id] = []
+    if week_id not in VOTES:
+        VOTES[week_id] = {}
+    if week_id not in USER_VOTES:
+        USER_VOTES[week_id] = {}
 
 
-# -----------------------------------------------------------------------------
-# APP
-# -----------------------------------------------------------------------------
+# =========================
+# Telegram auth (dev-friendly)
+# =========================
 
-app = FastAPI(title=APP_NAME)
+def user_id_from_telegram_init_data(init_data: Optional[str]) -> int:
+    """
+    У тебя "в дев-режиме пустой initData допускается".
+    Поэтому: если initData нет — возвращаем фиктивного пользователя 0.
+    """
+    if not init_data:
+        return 0
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # для теста нормально
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    # Нормальный разбор initData можно добавить позже.
+    # Сейчас оставляем простую стабильную заглушку:
+    # если в init_data есть "user_id=123" — вытащим.
+    m = re.search(r"(?:user_id=|\"id\":)(\d+)", init_data)
+    if m:
+        try:
+            return int(m.group(1))
+        except Exception:
+            return 0
+    return 0
 
 
-# -----------------------------------------------------------------------------
-# ROUTES
-# -----------------------------------------------------------------------------
+# =========================
+# Admin auth (optional)
+# =========================
+
+def require_admin(x_admin_token: Optional[str]) -> None:
+    """
+    Если ADMIN_TOKEN не задан — разрешаем (удобно на старте).
+    Если задан — требуем header X-Admin-Token.
+    """
+    admin = os.getenv("ADMIN_TOKEN", "").strip()
+    if not admin:
+        return
+    if not x_admin_token or x_admin_token.strip() != admin:
+        raise HTTPException(status_code=401, detail="ADMIN_UNAUTHORIZED")
+
+
+# =========================
+# Apple/iTunes enrich + YouTube fallback
+# =========================
+
+def youtube_fallback_url(artist: str, title: str) -> str:
+    from urllib.parse import quote_plus
+    q = quote_plus(f"{artist} {title}".strip())
+    return f"https://www.youtube.com/results?search_query={q}"
+
+
+def itunes_enrich(artist: str, title: str):
+    """
+    Возвращает (preview_url, cover_url) или (None, None)
+    Используем iTunes Search API:
+    - previewUrl (30 сек)
+    - artworkUrl100 (обложка)
+    """
+    from urllib.parse import quote_plus
+
+    q = f"{artist} {title}".strip()
+    url = f"https://itunes.apple.com/search?term={quote_plus(q)}&entity=song&limit=1"
+    try:
+        r = requests.get(url, timeout=15)
+        if r.status_code != 200:
+            return None, None
+        data = r.json()
+        results = data.get("results") or []
+        if not results:
+            return None, None
+
+        item = results[0]
+        preview = item.get("previewUrl")
+
+        art = item.get("artworkUrl100") or item.get("artworkUrl60") or item.get("artworkUrl30")
+        if art:
+            # увеличиваем размер, если строка подходит под шаблон
+            art = re.sub(r"/\d+x\d+bb\.", "/600x600bb.", art)
+            art = re.sub(r"/\d+x\d+bb-", "/600x600bb-", art)
+
+        return preview, art
+    except Exception:
+        return None, None
+
+
+# =========================
+# Routes
+# =========================
 
 @app.get("/health")
 def health():
-    return {"ok": True, "name": APP_NAME, "time": int(time.time())}
+    return {"ok": True}
 
 
 @app.get("/weeks/current", response_model=WeekOut)
-def weeks_current():
+def weeks_current(
+    x_telegram_init_data: Optional[str] = Header(default=None),
+):
+    _ = user_id_from_telegram_init_data(x_telegram_init_data)
+    ensure_week_exists(CURRENT_WEEK.id)
     return CURRENT_WEEK
 
 
@@ -175,7 +193,6 @@ def weeks_songs(
     search: str = "",
     x_telegram_init_data: Optional[str] = Header(default=None),
 ):
-    # auth (в дев-режиме пустой initData допускается)
     _ = user_id_from_telegram_init_data(x_telegram_init_data)
 
     ensure_week_exists(week_id)
@@ -186,25 +203,71 @@ def weeks_songs(
 
     if search.strip():
         q = search.strip().lower()
-        items = [
-            s for s in items
-            if q in (s.artist + " " + s.title).lower()
-        ]
+        items = [s for s in items if q in (s.artist + " " + s.title).lower()]
 
-    # По умолчанию возвращаем как есть (у тебя там уже логика сортировок на фронте)
+    # enrich: add youtube fallback always, and try iTunes for cover/preview if missing
+    for s in items:
+        if not s.youtube_url:
+            s.youtube_url = youtube_fallback_url(s.artist, s.title)
+
+        # only fetch if something missing
+        if not s.preview_url or not s.cover:
+            preview, cover = itunes_enrich(s.artist, s.title)
+            if preview and not s.preview_url:
+                s.preview_url = preview
+            if cover and not s.cover:
+                s.cover = cover
+
     return items
 
 
 @app.get("/weeks/{week_id}/results")
 def weeks_results(week_id: int):
-    """
-    Отдаёт текущие счётчики голосов.
-    Это пригодится позже для админки/итогов.
-    """
     ensure_week_exists(week_id)
     votes = VOTES.get(week_id, {})
-    # Вернём в удобном виде: [{song_id, votes}]
     return [{"song_id": sid, "votes": votes.get(sid, 0)} for sid in sorted(votes.keys())]
+
+
+@app.post("/admin/weeks/current/songs/bulk")
+def admin_add_songs(
+    songs: list = Body(...),
+    x_admin_token: Optional[str] = Header(default=None, alias="X-Admin-Token"),
+):
+    require_admin(x_admin_token)
+
+    week = get_current_week()
+    ensure_week_exists(week.id)
+
+    if not isinstance(songs, list):
+        raise HTTPException(status_code=400, detail="songs must be a list")
+
+    added: List[SongOut] = []
+
+    for raw in songs:
+        # raw can be dict-like or already simple
+        if not isinstance(raw, dict):
+            raise HTTPException(status_code=400, detail="each item must be an object {artist,title,...}")
+
+        title = (raw.get("title") or "").strip()
+        artist = (raw.get("artist") or "").strip()
+        if not title or not artist:
+            raise HTTPException(status_code=400, detail="each song must include artist and title")
+
+        s = SongOut(
+            id=next_song_id(),
+            title=title,
+            artist=artist,
+            is_new=bool(raw.get("is_new", True)),  # новинки по умолчанию true для bulk
+            cover=raw.get("cover"),
+            preview_url=raw.get("preview_url"),
+            youtube_url=raw.get("youtube_url"),
+            source=raw.get("source", "manual"),
+        )
+
+        SONGS_BY_WEEK[week.id].append(s)
+        added.append(s)
+
+    return {"week_id": week.id, "count": len(added), "added": added}
 
 
 @app.post("/weeks/{week_id}/vote", response_model=VoteOut)
@@ -222,20 +285,16 @@ def weeks_vote(
     song_ids = payload.song_ids or []
     song_ids = [int(x) for x in song_ids]
 
-    # проверяем, что такие песни вообще есть в этой неделе
     existing = {s.id for s in SONGS_BY_WEEK[week_id]}
     bad = [sid for sid in song_ids if sid not in existing]
     if bad:
         raise HTTPException(status_code=400, detail={"error": "INVALID_SONG_ID", "song_ids": bad})
 
-    # ограничение на количество выборов (если нужно) — поставим мягко 10
-    if len(song_ids) > 10:
-        raise HTTPException(status_code=400, detail="TOO_MANY_SONGS_MAX_10")
-
-    # анти-дубль: если уже голосовал — перезаписываем голос (сначала снимаем старые)
+    # unlimited voting selections (as you wanted)
     USER_VOTES.setdefault(week_id, {})
     VOTES.setdefault(week_id, {})
 
+    # overwrite user vote: remove previous
     prev = USER_VOTES[week_id].get(user_id, [])
     for sid in prev:
         VOTES[week_id][sid] = max(0, VOTES[week_id].get(sid, 0) - 1)
