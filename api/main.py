@@ -345,12 +345,13 @@ def weeks_songs(
     search: str = "",
     x_telegram_init_data: Optional[str] = Header(default=None),
 ):
-    # ✅ НЕ блокируем выдачу списка песен, даже если initData нет
-    # (в браузере он часто пустой)
+    # GET списка песен НЕ должен зависеть от Telegram initData.
+    # initData нужен для vote, а здесь — просто логируем (если есть).
     try:
-        _ = user_id_from_telegram_init_data(x_telegram_init_data)
-    except Exception:
-        pass
+        if x_telegram_init_data:
+            _ = user_id_from_telegram_init_data(x_telegram_init_data)
+    except Exception as e:
+        print("weeks_songs: bad initData (ignored):", repr(e))
 
     ensure_week_exists(week_id)
     items = SONGS_BY_WEEK.get(week_id, [])
