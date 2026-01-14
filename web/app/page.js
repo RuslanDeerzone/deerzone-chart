@@ -5,16 +5,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api";
 
 function getInitData() {
-  return window?.Telegram?.WebApp?.initData || "";
-}
-
-async function safeJson(r) {
-  const text = await r.text();
-  try {
-    return { ok: true, data: JSON.parse(text) };
-  } catch {
-    return { ok: false, text };
-  }
+  if (typeof window === "undefined") return "";
+  if (!window.Telegram) return "";
+  if (!window.Telegram.WebApp) return "";
+  return window.Telegram.WebApp.initData || "";
 }
 
 export default function Home() {
@@ -68,48 +62,41 @@ export default function Home() {
 
   // 2) грузим песни недели
   useEffect(() => {
-    if (!week?.id) return;
+  if (!week?.id) return;
 
-    (async () => {
+  (async () => {
+    try {
       setError("");
-      try {
-        const url = `${API_BASE}/weeks/${week.id}/songs?filter=${encodeURIComponent(
-          filter
-        )}&search=${encodeURIComponent(search)}`;
 
-        const r = await fetch(url, {
-          headers: initData ? { "X-Telegram-Init-Data": initData } : {},
-          cache: "no-store",
-        });
-
-        const parsed = await safeJson(r);
-
-        if (!r.ok) {
-          const detail =
-            parsed.ok && parsed.data?.detail
-              ? parsed.data.detail
-              : parsed.ok
-              ? JSON.stringify(parsed.data)
-              : parsed.text;
-
-          // типовые случаи
-          if (r.status === 401) throw new Error("Открой это через Telegram Mini App (initData отсутствует)");
-          if (r.status === 403) throw new Error("Нужна подписка на @deerzone");
-
-          throw new Error(`API ошибка (${r.status}): ${detail}`);
-        }
-
-        if (!parsed.ok) throw new Error("API вернул не-JSON");
-
-        // важно: приводим к массиву
-        const arr = Array.isArray(parsed.data) ? parsed.data : [];
-        setSongs(arr);
-      } catch (e) {
-        setSongs([]);
-        setError(e?.message || "API недоступен");
+      if (!initData) {
+        setError("Открой через Telegram");
+        return;
       }
-    })();
-  }, [week?.id, filter, search, initData]);
+
+      const url = ${API_BASE}/weeks/${week.id}/songs?filter=${filter}&search=${encodeURIComponent(search)};
+
+      const r = await fetch(url, {
+        headers: {
+          "X-Telegram-Init-Data": initData
+        },
+        cache: "no-store",
+      });
+
+      if (!r.ok) {
+        setError("Load failed");
+        return;
+      }
+
+      const data = await r.json();
+      setSongs(Array.isArray(data) ? data : []);
+
+    } catch (e) {
+      console.error(e);
+      setError("Load failed");
+    }
+  })();
+
+}, [week, filter, search, initData]);
 
   // аккуратно останавливаем аудио при смене страницы/размонтаже
   useEffect(() => {
