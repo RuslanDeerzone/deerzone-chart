@@ -202,8 +202,12 @@ def weeks_songs(
     search: str = "",
     x_telegram_init_data: Optional[str] = Header(default=None),
 ):
-    # auth (в дев-режиме пустой initData допускается)
-    _ = user_id_from_telegram_init_data(x_telegram_init_data)
+    # ✅ НЕ блокируем выдачу списка песен, даже если initData нет
+    # (в браузере он часто пустой)
+    try:
+        _ = user_id_from_telegram_init_data(x_telegram_init_data)
+    except Exception:
+        pass
 
     ensure_week_exists(week_id)
     items = SONGS_BY_WEEK.get(week_id, [])
@@ -216,7 +220,6 @@ def weeks_songs(
         items = [s for s in items if q in (s.artist + " " + s.title).lower()]
 
     return items
-
 
 @app.get("/weeks/{week_id}/results")
 def weeks_results(week_id: int):
