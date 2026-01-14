@@ -237,40 +237,52 @@ def weeks_vote(
 # Admin: bulk add songs to current week
 # =============================================================================
 
+from fastapi import Body
+
 @app.post("/admin/weeks/current/songs/bulk")
-def admin_add_songs(
-    songs: list = Body(...),
-    x_admin_token: Optional[str] = Header(default=None),
-):
-    require_admin(x_admin_token)
+def admin_add_songs(songs: list = Body(...), x_admin_token: Optional[str] = Header(default=None)):
+    # защита токеном (если у тебя уже есть ADMIN_TOKEN в env)
+    admin_token = os.environ.get("ADMIN_TOKEN")
+    if admin_token and x_admin_token != admin_token:
+        raise HTTPException(status_code=401, detail="BAD_ADMIN_TOKEN")
 
     week = get_current_week()
     week_id = week["id"]
+
     ensure_week_exists(week_id)
 
     if not isinstance(songs, list):
         raise HTTPException(400, detail="songs must be a list")
 
+    # куда реально читает GET:
     SONGS_BY_WEEK.setdefault(week_id, [])
+
+    # чтобы id не конфликтовали
+    existing_ids = [s.id for s in SONGS_BY_WEEK[week_id]]
+    next_id = (max(existing_ids) + 1) if existing_ids else 1
 
     added = []
     for s in songs:
-        # ожидаем: {title, artist, is_new?, cover?, preview_url?, source?}
+        title = s.get("title")
+        artist = s.get("artist")
+        if not title or not artist:
+            continue
+
         song = SongOut(
-            id=next_song_id(),
-            title=s.get("title") or "",
-            artist=s.get("artist") or "",
-            is_new=bool(s.get("is_new", False)),
+            id=next_id,
+            title=title,
+            artist=artist,
+            is_new=bool(s.get("is_new", True)),
             cover=s.get("cover"),
             preview_url=s.get("preview_url"),
+            youtube_url=s.get("youtube_url"),
             source=s.get("source", "manual"),
         )
-        if not song.title or not song.artist:
-            continue
         SONGS_BY_WEEK[week_id].append(song)
-        added.append(song.model_dump())
+        added.append(song)
+        next_id += 1
 
-    return {"week_id": week_id, "count": len(added), "added": added}
+    return {"week_id": week_id, "count": len(added)}
 
 
 # =============================================================================
