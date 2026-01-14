@@ -56,6 +56,8 @@ app = FastAPI()
 @app.on_event("startup")
 def startup_event():
     load_songs_from_file()
+print(f"SONGS_PATH = {SONGS_PATH} exists={SONGS_PATH.exists()}", flush=True)
+print(f"SONGS_WEEKS = {list(SONGS_BY_WEEK.keys())}", flush=True)
 
 # ✅ CORS для WEB + Telegram Mini App
 app.add_middleware(
