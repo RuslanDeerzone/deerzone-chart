@@ -61,58 +61,43 @@ export default function Home() {
     })();
   }, [initData]);
 
-  // 2) грузим песни недели
-  useEffect(() => {
-    if (!week?.id) return;
+// 2) грузим песни недели
+useEffect(() => {
+  if (!week?.id) return;
 
-    (async () => {
+  (async () => {
+    try {
       setError("");
-      try {
-        const url =
-          `${API_BASE}/weeks/${week.id}/songs` +
-          `?filter=${encodeURIComponent(filter)}` +
-          `&search=${encodeURIComponent(search)}`;
 
-        const r = await fetch(url, {
-          cache: "no-store",
-          headers: initData ? { "X-Telegram-Init-Data": initData } : {},
-        });
+      const f = filter === "new" ? "new" : "all";
+      const q = typeof search === "string" ? search : "";
 
-        const parsed = await safeJson(r);
+      const url =
+        ${API_BASE}/weeks/${week.id}/songs +
+        ?filter=${f}&search=${encodeURIComponent(q)};
 
-        if (!r.ok) {
-          const detail = parsed.ok ? JSON.stringify(parsed.data) : parsed.text;
+      const r = await fetch(url, {
+        cache: "no-store",
+        headers: initData
+          ? { "X-Telegram-Init-Data": initData }
+          : {},
+      });
 
-          // типовые случаи
-          if (r.status === 401) {
-            setError("Открой это через Telegram Mini App (нет initData)");
-            return;
-          }
-          if (r.status === 403) {
-            setError("Нужна подписка на @deerzone");
-            return;
-          }
-
-          setError(`Load failed: ${detail}`);
-          setSongs([]);
-          return;
-        }
-
-        if (!parsed.ok) {
-          setError("API вернул не-JSON");
-          setSongs([]);
-          return;
-        }
-
-        const arr = Array.isArray(parsed.data) ? parsed.data : [];
-        setSongs(arr);
-      } catch (e) {
-        console.error(e);
-        setSongs([]);
-        setError("Load failed");
+      if (!r.ok) {
+        throw new Error(`HTTP ${r.status}`);
       }
-    })();
-  }, [week?.id, filter, search, initData]);
+
+      const data = await r.json();
+
+      // ВАЖНО: API возвращает массив
+      setSongs(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error(e);
+      setSongs([]);
+      setError("Не удалось загрузить список");
+    }
+  })();
+}, [week?.id, filter, search, initData]);
 
   // аккуратно останавливаем аудио при размонтаже
   useEffect(() => {
