@@ -7,16 +7,26 @@ import requests
 from fastapi import FastAPI, Header, HTTPException, Body
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Response
 
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://sincere-perception-production-65ac.up.railway.app",
+        "https://web.telegram.org",
+        "http://localhost:3000",
+    ],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Fallback на случай, если preflight не перехватился middleware (Railway/прокси/сборка)
+@app.options("/{path:path}")
+def cors_preflight(path: str):
+    return Response(status_code=204)
 
 # =============================================================================
 # Models
