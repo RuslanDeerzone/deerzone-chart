@@ -6,11 +6,9 @@ from typing import List, Optional, Dict, Literal
 import requests
 from fastapi import FastAPI, Header, HTTPException, Body
 from pydantic import BaseModel
-
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
-
-from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
@@ -332,3 +330,7 @@ def admin_enrich_current_week(
             updated += 1
 
     return {"week_id": week_id, "updated": updated, "count": len(items)}
+
+@app.get("/__version")
+def __version():
+    return {"ok": True, "version": "cors-test-1"}
