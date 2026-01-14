@@ -4,13 +4,13 @@ import time
 from typing import List, Optional, Dict, Literal
 
 import requests
-from fastapi import FastAPI, Header, HTTPException, Body
-from pydantic import BaseModel
+from fastapi import FastAPI, Header, HTTPException, Body, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import Response
+from pydantic import BaseModel
 
 app = FastAPI()
 
+# ✅ CORS для WEB + Telegram Mini App
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -23,10 +23,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Fallback на случай, если preflight не перехватился middleware (Railway/прокси/сборка)
+# ✅ Fallback на случай, если прокси/сборка не пропускает preflight
 @app.options("/{path:path}")
-def cors_preflight(path: str):
-    return Response(status_code=204)
+def cors_preflight(path: str, request: Request):
+    origin = request.headers.get("origin")
+    headers = {
+        "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+        "Access-Control-Allow-Headers": "content-type,x-telegram-init-data,x-admin-token",
+        "Access-Control-Max-Age": "86400",
+    }
+    if origin in {
+        "https://sincere-perception-production-65ac.up.railway.app",
+        "https://web.telegram.org",
+        "http://localhost:3000",
+    }:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Vary"] = "Origin"
+    return Response(status_code=204, headers=headers)
 
 # =============================================================================
 # Models
