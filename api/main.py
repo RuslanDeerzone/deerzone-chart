@@ -25,72 +25,105 @@ app.add_middleware(
 )
 
 import traceback
-from fastapi import Body, Header, HTTPException
 
 @app.post("/admin/weeks/current/songs/enrich")
 def admin_enrich_current_week(
     force: bool = Body(default=False),
     x_admin_token: Optional[str] = Header(default=None),
 ):
-    try:
-        require_admin(x_admin_token)
+    require_admin(x_admin_token)
 
+    try:
         week = get_current_week()
         week_id = week["id"]
         ensure_week_exists(week_id)
 
         items = SONGS_BY_WEEK.get(week_id, [])
+        if not isinstance(items, list):
+            print(f"ENRICH: week_id={week_id} items is not list, got {type(items)}")
+            items = []
+
         updated = 0
+        skipped = 0
+        processed = 0
+        errors = 0
 
-        print(f"ENRICH: start week_id={week_id} items={len(items)} force={force}", flush=True)
+        def get_field(obj, key, default=None):
+            # поддержка dict и объектов
+            if isinstance(obj, dict):
+                return obj.get(key, default)
+            return getattr(obj, key, default)
 
-        for s in items:
-            try:
-                # если force=False и уже есть cover или preview_url — пропускаем
-                has_cover = bool(getattr(s, "cover", None))
-                has_preview = bool(getattr(s, "preview_url", None))
-                if (not force) and (has_cover or has_preview):
-                    continue
+        def set_field(obj, key, value):
+            if isinstance(obj, dict):
+                obj[key] = value
+            else:
+                setattr(obj, key, value)
 
-                print(
-                    f"ENRICH: trying: {s.artist} — {s.title} | force={force} | cover={has_cover} preview={has_preview}",
-                    flush=True,
-                )
+        for idx, s in enumerate(items):
+            processed += 1
 
-                res = itunes_search_track(s.artist, s.title)
-                if not res:
-                    print(f"ENRICH: not found: {s.artist} — {s.title}", flush=True)
-                    continue
+            artist = get_field(s, "artist", "") or ""
+            title = get_field(s, "title", "") or ""
+            cover = get_field(s, "cover", None)
+            preview_url = get_field(s, "preview_url", None)
 
-                track = res.get("track", {}) if isinstance(res, dict) else {}
-                cover = track.get("cover") or track.get("artworkUrl100") or track.get("artworkUrl60")
-                preview = track.get("preview_url") or track.get("previewUrl")
-
-                changed = False
-                if cover and not getattr(s, "cover", None):
-                    s.cover = cover
-                    changed = True
-                if preview and not getattr(s, "preview_url", None):
-                    s.preview_url = preview
-                    changed = True
-
-                if changed:
-                    updated += 1
-                    print(f"ENRICH: updated: {s.artist} — {s.title}", flush=True)
-                else:
-                    print(f"ENRICH: found but nothing to update: {s.artist} — {s.title}", flush=True)
-
-            except Exception:
-                print(f"ENRICH: song failed: {getattr(s,'artist','?')} — {getattr(s,'title','?')}", flush=True)
-                print(traceback.format_exc(), flush=True)
+            if not force and (cover or preview_url):
+                skipped += 1
                 continue
 
-        print(f"ENRICH: done week_id={week_id} updated={updated}", flush=True)
-        return {"week_id": week_id, "updated": updated, "count": len(items)}
+            try:
+                print(f"ENRICH: [{idx}] try artist='{artist}' title='{title}' force={force}")
+                res = itunes_search_track(artist, title)
+
+                if not res:
+                    print(f"ENRICH: [{idx}] not found")
+                    continue
+
+                # ожидаем, что itunes_search_track вернёт dict с полями
+                new_cover = res.get("cover") or res.get("artworkUrl100") or res.get("artworkUrl60")
+                new_preview = res.get("preview_url") or res.get("previewUrl")
+
+                if new_cover:
+                    set_field(s, "cover", new_cover)
+                if new_preview:
+                    set_field(s, "preview_url", new_preview)
+
+                # пометим источник, если надо
+                if get_field(s, "source", None) is None:
+                    set_field(s, "source", "itunes")
+
+                if new_cover or new_preview:
+                    updated += 1
+                    print(f"ENRICH: [{idx}] updated cover={bool(new_cover)} preview={bool(new_preview)}")
+                else:
+                    print(f"ENRICH: [{idx}] response ok but no media fields")
+
+            except Exception:
+                errors += 1
+                print(f"ENRICH: [{idx}] FAILED for artist='{artist}' title='{title}'")
+                print(traceback.format_exc())
+
+        # сохраним на диск, если у тебя есть helper для сохранения
+        # если нет — просто закомментируй этот блок
+        try:
+            save_songs_for_week(week_id)  # если у тебя есть такая функция
+        except Exception:
+            # не роняем enrich из-за сохранения, но логируем
+            print("ENRICH: save_songs_for_week FAILED (can be ok if no such function)")
+            print(traceback.format_exc())
+
+        return {
+            "week_id": week_id,
+            "processed": processed,
+            "updated": updated,
+            "skipped": skipped,
+            "errors": errors,
+        }
 
     except Exception:
-        print("ENRICH FAILED (endpoint):", flush=True)
-        print(traceback.format_exc(), flush=True)
+        print("ENRICH: TOP-LEVEL FAILED")
+        print(traceback.format_exc())
         raise
 
 
