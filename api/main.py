@@ -393,41 +393,47 @@ def admin_add_songs(songs: list = Body(...), x_admin_token: Optional[str] = Head
 # Admin: enrich current week songs with iTunes preview + cover
 # =============================================================================
 
-@app.post("/admin/weeks/current/songs/enrich")
+import traceback
+
+"/admin/weeks/current/songs/enrich"
 def admin_enrich_current_week(
     force: bool = Body(default=False),
     x_admin_token: Optional[str] = Header(default=None),
 ):
-    require_admin(x_admin_token)
+    try:
+        require_admin(x_admin_token)
 
-    week = get_current_week()
-    week_id = week["id"]
-    ensure_week_exists(week_id)
+        week = get_current_week()
+        week_id = week["id"]
+        ensure_week_exists(week_id)
 
-    items = SONGS_BY_WEEK.get(week_id, [])
-    updated = 0
+        items = SONGS_BY_WEEK.get(week_id, [])
+        updated = 0
 
-    for s in items:
-        if not force and (s.cover or s.preview_url):
-            continue
+        for s in items:
+            # если force=False — не трогаем уже заполненные
+            if not force and (s.cover or s.preview_url):
+                continue
 
-        res = itunes_search_track(s.artist, s.title)
-        if not res:
-            continue
+            # ВОТ ЗДЕСЬ мы ловим падения iTunes/requests, чтобы не уронить весь enrich
+            try:
+                res = itunes_search_track(s.artist, s.title)
+            except Exception as e:
+                print("ENRICH ITEM ERROR:", s.artist, "|", s.title, "|", repr(e))
+                continue
 
-        new_preview = res.get("previewUrl")
-        new_cover = itunes_pick_cover(res.get("artworkUrl100"))
+            if not res:
+                continue
 
-        if force or not s.preview_url:
-            s.preview_url = new_preview
-        if force or not s.cover:
-            s.cover = new_cover
-
-        if new_preview or new_cover:
+            # заполняем поля
+            s.cover = res.get("cover")
+            s.preview_url = res.get("preview_url")
+            s.source = res.get("source", "itunes")
             updated += 1
 
-    return {"week_id": week_id, "updated": updated, "count": len(items)}
+        return {"week_id": week_id, "updated": updated, "count": len(items)}
 
-@app.get("/__version")
-def __version():
-    return {"ok": True, "version": "cors-test-1"}
+    except Exception:
+        print("ENRICH FAILED (full traceback):")
+        print(traceback.format_exc())
+        raise
