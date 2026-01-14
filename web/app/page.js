@@ -56,7 +56,7 @@ export default function Home() {
         setWeek(parsed.data);
       } catch (e) {
         console.error(e);
-        setError("API недоступен");
+        setError("Не удалось загрузить список");
       }
     })();
   }, [initData]);
@@ -185,7 +185,15 @@ export default function Home() {
   const selectedCount = selected.size;
 
   return (
-    <div style={{ maxWidth: 760, margin: "0 auto", padding: 18 }}>
+    <div
+  style={{
+    maxWidth: 760,
+    margin: "0 auto",
+    padding: 18,
+    fontFamily:
+      "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, Arial, sans-serif"
+  }}
+>
       <div style={{ height: 8, background: "#ff3fa4", borderRadius: 99 }} />
 
       <div style={{ marginTop: 18, fontSize: 44, fontWeight: 900 }}>
