@@ -2,6 +2,7 @@ import os
 import re
 import time
 from typing import List, Optional, Dict, Literal
+import traceback
 
 import requests
 from fastapi import FastAPI, Header, HTTPException, Body, Response, Request
@@ -22,6 +23,55 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.post("/admin/weeks/current/songs/enrich")
+def admin_enrich_current_week(
+    force: bool = Body(default=False),
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    try:
+        # проверка админ-токена (у тебя эта функция уже есть, раз работает bulk)
+        require_admin(x_admin_token)
+
+        week = get_current_week()
+        week_id = week["id"]
+        ensure_week_exists(week_id)
+
+        items = SONGS_BY_WEEK.get(week_id, [])
+        updated = 0
+
+        for s in items:
+            # если force=False и уже есть cover/preview_url — пропускаем
+            if (not force) and (getattr(s, "cover", None) or getattr(s, "preview_url", None)):
+                continue
+
+            res = itunes_search_track(s.artist, s.title)
+            if not res:
+                continue
+
+            cover = res.get("cover")
+            preview_url = res.get("preview_url")
+            youtube_url = res.get("youtube_url")
+
+            if cover:
+                s.cover = cover
+            if preview_url:
+                s.preview_url = preview_url
+            if youtube_url:
+                s.youtube_url = youtube_url
+
+            # помечаем источник, чтобы было видно что обогатили
+            if cover or preview_url or youtube_url:
+                s.source = "itunes"
+                updated += 1
+
+        return {"week_id": week_id, "updated": updated, "count": len(items)}
+
+    except Exception:
+        print("ENRICH FAILED:")
+        print(traceback.format_exc())
+        raise
+
 
 # ✅ Fallback на случай, если прокси/сборка не пропускает preflight
 @app.options("/{path:path}")

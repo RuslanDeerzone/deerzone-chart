@@ -1,0 +1,1 @@
+router = APIRouter(prefix="/admin") и @router.post("/weeks/current/songs/enrich")
