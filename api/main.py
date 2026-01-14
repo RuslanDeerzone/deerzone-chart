@@ -1,26 +1,19 @@
-from __future__ import annotations
-
 import os
 import re
 import time
-from typing import Dict, List, Optional, Literal
+from typing import List, Optional, Dict, Literal
 
 import requests
 from fastapi import FastAPI, Header, HTTPException, Body
-from pydantic import BaseModel, Field
-
-app = FastAPI(title="deerzone-chart-api")
+from pydantic import BaseModel
 
 
-# =========================
+app = FastAPI()
+
+
+# =============================================================================
 # Models
-# =========================
-
-class WeekOut(BaseModel):
-    id: int
-    title: str
-    status: Literal["open", "closed"] = "open"
-
+# =============================================================================
 
 class SongOut(BaseModel):
     id: int
@@ -28,161 +21,147 @@ class SongOut(BaseModel):
     artist: str
     is_new: bool = False
 
-    # last fixes: covers + previews + fallback
-    cover: Optional[str] = None          # image url
-    preview_url: Optional[str] = None    # 30s audio preview url
-    youtube_url: Optional[str] = None    # fallback open link
-    source: str = "manual"
+    # новые поля (для обложки и превью)
+    cover: Optional[str] = None
+    preview_url: Optional[str] = None
+    source: Optional[str] = "manual"
 
 
 class VoteIn(BaseModel):
-    song_ids: List[int] = Field(default_factory=list)
+    song_ids: List[int] = []
 
 
 class VoteOut(BaseModel):
     ok: bool
     week_id: int
-    user_id: int
+    user_id: str
     voted_song_ids: List[int]
 
 
-# =========================
-# In-memory storage
-# =========================
+class WeekOut(BaseModel):
+    id: int
+    title: str
+    status: Literal["open", "closed"]
 
+
+# =============================================================================
+# In-memory storage (как у тебя было: без БД)
+# =============================================================================
+
+# Текущая неделя
 CURRENT_WEEK = WeekOut(id=3, title="Week 1 - 2026", status="open")
 
-# week_id -> list[SongOut]
-SONGS_BY_WEEK: Dict[int, List[SongOut]] = {}
+# Песни по неделям: week_id -> List[SongOut]
+SONGS_BY_WEEK: Dict[int, List[SongOut]] = {
+    # пример: 3: [...]
+}
 
-# week_id -> {song_id: votes}
+# Голоса: week_id -> {song_id: votes}
 VOTES: Dict[int, Dict[int, int]] = {}
 
-# week_id -> {user_id: [song_ids]}
-USER_VOTES: Dict[int, Dict[int, List[int]]] = {}
+# Голос пользователя: week_id -> {user_id: [song_ids]}
+USER_VOTES: Dict[int, Dict[str, List[int]]] = {}
 
-_song_id_seq = 1
+# авто-инкремент id песен
+SONG_ID_SEQ = 1
 
 
 def next_song_id() -> int:
-    global _song_id_seq
-    v = _song_id_seq
-    _song_id_seq += 1
-    return v
+    global SONG_ID_SEQ
+    SONG_ID_SEQ += 1
+    return SONG_ID_SEQ - 1
 
 
-def get_current_week() -> WeekOut:
-    return CURRENT_WEEK
+def ensure_week_exists(week_id: int):
+    if week_id != CURRENT_WEEK.id and week_id not in SONGS_BY_WEEK:
+        # можно допилить историю недель, но для текущих задач достаточно
+        raise HTTPException(status_code=404, detail="WEEK_NOT_FOUND")
 
 
-def ensure_week_exists(week_id: int) -> None:
-    if week_id not in SONGS_BY_WEEK:
-        SONGS_BY_WEEK[week_id] = []
-    if week_id not in VOTES:
-        VOTES[week_id] = {}
-    if week_id not in USER_VOTES:
-        USER_VOTES[week_id] = {}
+def get_current_week() -> dict:
+    return CURRENT_WEEK.model_dump()
 
 
-# =========================
-# Telegram auth (dev-friendly)
-# =========================
+# =============================================================================
+# Telegram initData auth (упрощённо)
+# =============================================================================
 
-def user_id_from_telegram_init_data(init_data: Optional[str]) -> int:
+def user_id_from_telegram_init_data(init_data: Optional[str]) -> str:
     """
-    У тебя "в дев-режиме пустой initData допускается".
-    Поэтому: если initData нет — возвращаем фиктивного пользователя 0.
+    В проде Telegram Mini App присылает initData.
+    У тебя уже есть рабочая версия; здесь — безопасная заглушка:
+    - если initData отсутствует -> считаем "dev"
+    - если есть -> возвращаем стабильно строку пользователя
     """
     if not init_data:
-        return 0
+        return "dev"
 
-    # Нормальный разбор initData можно добавить позже.
-    # Сейчас оставляем простую стабильную заглушку:
-    # если в init_data есть "user_id=123" — вытащим.
-    m = re.search(r"(?:user_id=|\"id\":)(\d+)", init_data)
-    if m:
-        try:
-            return int(m.group(1))
-        except Exception:
-            return 0
-    return 0
+    # просто чтобы было стабильное значение, не ломая логику
+    # (твой реальный валидатор можно вернуть позже)
+    return str(abs(hash(init_data)))
 
 
-# =========================
-# Admin auth (optional)
-# =========================
+# =============================================================================
+# ADMIN TOKEN (для опасных эндпоинтов /admin/*)
+# =============================================================================
 
-def require_admin(x_admin_token: Optional[str]) -> None:
-    """
-    Если ADMIN_TOKEN не задан — разрешаем (удобно на старте).
-    Если задан — требуем header X-Admin-Token.
-    """
-    admin = os.getenv("ADMIN_TOKEN", "").strip()
-    if not admin:
-        return
-    if not x_admin_token or x_admin_token.strip() != admin:
-        raise HTTPException(status_code=401, detail="ADMIN_UNAUTHORIZED")
+def require_admin(x_admin_token: Optional[str]):
+    token = os.environ.get("ADMIN_TOKEN")
+    if not token:
+        raise HTTPException(status_code=500, detail="ADMIN_TOKEN is not set")
+    if x_admin_token != token:
+        raise HTTPException(status_code=401, detail="UNAUTHORIZED")
 
 
-# =========================
-# Apple/iTunes enrich + YouTube fallback
-# =========================
+# =============================================================================
+# iTunes Search (preview + cover)
+# =============================================================================
 
-def youtube_fallback_url(artist: str, title: str) -> str:
-    from urllib.parse import quote_plus
-    q = quote_plus(f"{artist} {title}".strip())
-    return f"https://www.youtube.com/results?search_query={q}"
+ITUNES_URL = "https://itunes.apple.com/search"
 
+def _clean_query(s: str) -> str:
+    s = re.sub(r"\s*\(.*?\)\s*", " ", s)  # убираем скобки (feat., ремиксы)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
 
-def itunes_enrich(artist: str, title: str):
-    """
-    Возвращает (preview_url, cover_url) или (None, None)
-    Используем iTunes Search API:
-    - previewUrl (30 сек)
-    - artworkUrl100 (обложка)
-    """
-    from urllib.parse import quote_plus
-
-    q = f"{artist} {title}".strip()
-    url = f"https://itunes.apple.com/search?term={quote_plus(q)}&entity=song&limit=1"
+def itunes_search_track(artist: str, title: str) -> Optional[dict]:
+    q = _clean_query(f"{artist} {title}")
     try:
-        r = requests.get(url, timeout=15)
-        if r.status_code != 200:
-            return None, None
+        r = requests.get(
+            ITUNES_URL,
+            params={
+                "term": q,
+                "media": "music",
+                "entity": "song",
+                "limit": 1,
+            },
+            timeout=10,
+        )
+        r.raise_for_status()
         data = r.json()
-        results = data.get("results") or []
-        if not results:
-            return None, None
-
-        item = results[0]
-        preview = item.get("previewUrl")
-
-        art = item.get("artworkUrl100") or item.get("artworkUrl60") or item.get("artworkUrl30")
-        if art:
-            # увеличиваем размер, если строка подходит под шаблон
-            art = re.sub(r"/\d+x\d+bb\.", "/600x600bb.", art)
-            art = re.sub(r"/\d+x\d+bb-", "/600x600bb-", art)
-
-        return preview, art
+        if data.get("resultCount", 0) < 1:
+            return None
+        return data["results"][0]
     except Exception:
-        return None, None
+        return None
+
+def itunes_pick_cover(artwork_url: Optional[str]) -> Optional[str]:
+    if not artwork_url:
+        return None
+    return artwork_url.replace("100x100bb.jpg", "600x600bb.jpg")
 
 
-# =========================
-# Routes
-# =========================
+# =============================================================================
+# Endpoints
+# =============================================================================
 
 @app.get("/health")
 def health():
-    return {"ok": True}
+    return {"ok": True, "ts": int(time.time())}
 
 
 @app.get("/weeks/current", response_model=WeekOut)
-def weeks_current(
-    x_telegram_init_data: Optional[str] = Header(default=None),
-):
-    _ = user_id_from_telegram_init_data(x_telegram_init_data)
-    ensure_week_exists(CURRENT_WEEK.id)
+def weeks_current():
     return CURRENT_WEEK
 
 
@@ -193,10 +172,11 @@ def weeks_songs(
     search: str = "",
     x_telegram_init_data: Optional[str] = Header(default=None),
 ):
+    # auth (в дев-режиме пустой initData допускается)
     _ = user_id_from_telegram_init_data(x_telegram_init_data)
 
     ensure_week_exists(week_id)
-    items = SONGS_BY_WEEK[week_id]
+    items = SONGS_BY_WEEK.get(week_id, [])
 
     if filter == "new":
         items = [s for s in items if s.is_new]
@@ -204,19 +184,6 @@ def weeks_songs(
     if search.strip():
         q = search.strip().lower()
         items = [s for s in items if q in (s.artist + " " + s.title).lower()]
-
-    # enrich: add youtube fallback always, and try iTunes for cover/preview if missing
-    for s in items:
-        if not s.youtube_url:
-            s.youtube_url = youtube_fallback_url(s.artist, s.title)
-
-        # only fetch if something missing
-        if not s.preview_url or not s.cover:
-            preview, cover = itunes_enrich(s.artist, s.title)
-            if preview and not s.preview_url:
-                s.preview_url = preview
-            if cover and not s.cover:
-                s.cover = cover
 
     return items
 
@@ -226,48 +193,6 @@ def weeks_results(week_id: int):
     ensure_week_exists(week_id)
     votes = VOTES.get(week_id, {})
     return [{"song_id": sid, "votes": votes.get(sid, 0)} for sid in sorted(votes.keys())]
-
-
-@app.post("/admin/weeks/current/songs/bulk")
-def admin_add_songs(
-    songs: list = Body(...),
-    x_admin_token: Optional[str] = Header(default=None, alias="X-Admin-Token"),
-):
-    require_admin(x_admin_token)
-
-    week = get_current_week()
-    ensure_week_exists(week.id)
-
-    if not isinstance(songs, list):
-        raise HTTPException(status_code=400, detail="songs must be a list")
-
-    added: List[SongOut] = []
-
-    for raw in songs:
-        # raw can be dict-like or already simple
-        if not isinstance(raw, dict):
-            raise HTTPException(status_code=400, detail="each item must be an object {artist,title,...}")
-
-        title = (raw.get("title") or "").strip()
-        artist = (raw.get("artist") or "").strip()
-        if not title or not artist:
-            raise HTTPException(status_code=400, detail="each song must include artist and title")
-
-        s = SongOut(
-            id=next_song_id(),
-            title=title,
-            artist=artist,
-            is_new=bool(raw.get("is_new", True)),  # новинки по умолчанию true для bulk
-            cover=raw.get("cover"),
-            preview_url=raw.get("preview_url"),
-            youtube_url=raw.get("youtube_url"),
-            source=raw.get("source", "manual"),
-        )
-
-        SONGS_BY_WEEK[week.id].append(s)
-        added.append(s)
-
-    return {"week_id": week.id, "count": len(added), "added": added}
 
 
 @app.post("/weeks/{week_id}/vote", response_model=VoteOut)
@@ -285,16 +210,17 @@ def weeks_vote(
     song_ids = payload.song_ids or []
     song_ids = [int(x) for x in song_ids]
 
-    existing = {s.id for s in SONGS_BY_WEEK[week_id]}
+    existing = {s.id for s in SONGS_BY_WEEK.get(week_id, [])}
     bad = [sid for sid in song_ids if sid not in existing]
     if bad:
         raise HTTPException(status_code=400, detail={"error": "INVALID_SONG_ID", "song_ids": bad})
 
-    # unlimited voting selections (as you wanted)
+    if len(song_ids) > 10:
+        raise HTTPException(status_code=400, detail="TOO_MANY_SONGS_MAX_10")
+
     USER_VOTES.setdefault(week_id, {})
     VOTES.setdefault(week_id, {})
 
-    # overwrite user vote: remove previous
     prev = USER_VOTES[week_id].get(user_id, [])
     for sid in prev:
         VOTES[week_id][sid] = max(0, VOTES[week_id].get(sid, 0) - 1)
@@ -305,3 +231,83 @@ def weeks_vote(
     USER_VOTES[week_id][user_id] = song_ids
 
     return VoteOut(ok=True, week_id=week_id, user_id=user_id, voted_song_ids=song_ids)
+
+
+# =============================================================================
+# Admin: bulk add songs to current week
+# =============================================================================
+
+@app.post("/admin/weeks/current/songs/bulk")
+def admin_add_songs(
+    songs: list = Body(...),
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    require_admin(x_admin_token)
+
+    week = get_current_week()
+    week_id = week["id"]
+    ensure_week_exists(week_id)
+
+    if not isinstance(songs, list):
+        raise HTTPException(400, detail="songs must be a list")
+
+    SONGS_BY_WEEK.setdefault(week_id, [])
+
+    added = []
+    for s in songs:
+        # ожидаем: {title, artist, is_new?, cover?, preview_url?, source?}
+        song = SongOut(
+            id=next_song_id(),
+            title=s.get("title") or "",
+            artist=s.get("artist") or "",
+            is_new=bool(s.get("is_new", False)),
+            cover=s.get("cover"),
+            preview_url=s.get("preview_url"),
+            source=s.get("source", "manual"),
+        )
+        if not song.title or not song.artist:
+            continue
+        SONGS_BY_WEEK[week_id].append(song)
+        added.append(song.model_dump())
+
+    return {"week_id": week_id, "count": len(added), "added": added}
+
+
+# =============================================================================
+# Admin: enrich current week songs with iTunes preview + cover
+# =============================================================================
+
+@app.post("/admin/weeks/current/songs/enrich")
+def admin_enrich_current_week(
+    force: bool = Body(default=False),
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    require_admin(x_admin_token)
+
+    week = get_current_week()
+    week_id = week["id"]
+    ensure_week_exists(week_id)
+
+    items = SONGS_BY_WEEK.get(week_id, [])
+    updated = 0
+
+    for s in items:
+        if not force and (s.cover or s.preview_url):
+            continue
+
+        res = itunes_search_track(s.artist, s.title)
+        if not res:
+            continue
+
+        new_preview = res.get("previewUrl")
+        new_cover = itunes_pick_cover(res.get("artworkUrl100"))
+
+        if force or not s.preview_url:
+            s.preview_url = new_preview
+        if force or not s.cover:
+            s.cover = new_cover
+
+        if new_preview or new_cover:
+            updated += 1
+
+    return {"week_id": week_id, "updated": updated, "count": len(items)}

@@ -1,194 +1,186 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-/**
- * deerzone chart – web/app/page.js
- *
- * Что умеет:
- * - New / All фильтр (Returning убран)
- * - Сортировка: только A–Z (по артисту, затем по треку)
- * - Поиск
- * - Обложка (s.cover) + превью (s.preview_url) + fallback YouTube (s.youtube_url)
- * - Голосование: 1 аккаунт = 1 голосование (сервер перезаписывает), выбрать можно сколько угодно треков
- * - Ошибки 401/403 показываются понятно
- */
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+function getInitData() {
+  return window?.Telegram?.WebApp?.initData || "";
+}
 
-function getTelegramInitData() {
+async function safeJson(r) {
+  const text = await r.text();
   try {
-    // Telegram Mini App
-    const tg = window.Telegram?.WebApp;
-    if (!tg) return "";
-    tg.ready?.();
-    return tg.initData || "";
+    return { ok: true, data: JSON.parse(text) };
   } catch {
-    return "";
+    return { ok: false, text };
   }
 }
 
 export default function Home() {
-  const [initData, setInitData] = useState("");
   const [week, setWeek] = useState(null);
 
-  const [filter, setFilter] = useState("all"); // all | new
+  const [filter, setFilter] = useState("all"); // "all" | "new"
   const [search, setSearch] = useState("");
 
   const [songs, setSongs] = useState([]);
-  const [selected, setSelected] = useState(() => new Set());
+  const [selected, setSelected] = useState(new Set());
 
   const [error, setError] = useState("");
-  const [loadingWeek, setLoadingWeek] = useState(true);
-  const [loadingSongs, setLoadingSongs] = useState(false);
-  const [voting, setVoting] = useState(false);
-  const [voteOk, setVoteOk] = useState("");
 
-  // one-audio-at-a-time
-  const [audioObj, setAudioObj] = useState(null);
+  // аудио превью
+  const audioRef = useRef(null);
+  const [playingId, setPlayingId] = useState(null); // song.id который сейчас играет
 
-  // INIT DATA
+  const initData = useMemo(() => getInitData(), []);
+
+  // 1) грузим текущую неделю
   useEffect(() => {
-    setInitData(getTelegramInitData());
-  }, []);
+    (async () => {
+      setError("");
+      try {
+        const r = await fetch(`${API_BASE}/weeks/current`, {
+          headers: initData ? { "X-Telegram-Init-Data": initData } : {},
+          cache: "no-store",
+        });
 
-  // LOAD CURRENT WEEK
-  useEffect(() => {
-    setError("");
-    setVoteOk("");
-    setLoadingWeek(true);
+        const parsed = await safeJson(r);
 
-    fetch(`${API_BASE}/weeks/current`, {
-      headers: initData ? { "X-Telegram-Init-Data": initData } : {},
-    })
-      .then(async (r) => {
-        if (r.status === 403) throw new Error("Нужна подписка на @deerzone");
-        if (r.status === 401) throw new Error("Открой это через Telegram Mini App (initData отсутствует)");
-        if (!r.ok) throw new Error("Не удалось загрузить неделю");
-        return r.json();
-      })
-      .then((data) => {
-        setWeek(data);
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoadingWeek(false));
+        if (!r.ok) {
+          // если сервер вернул JSON — покажем detail, иначе raw
+          const detail =
+            parsed.ok && parsed.data?.detail
+              ? parsed.data.detail
+              : parsed.ok
+              ? JSON.stringify(parsed.data)
+              : parsed.text;
+          throw new Error(`API ошибка (${r.status}): ${detail}`);
+        }
+
+        if (!parsed.ok) throw new Error("API вернул не-JSON");
+
+        setWeek(parsed.data);
+      } catch (e) {
+        setError(e?.message || "API недоступен");
+      }
+    })();
   }, [initData]);
 
-  // LOAD SONGS
+  // 2) грузим песни недели
   useEffect(() => {
     if (!week?.id) return;
 
-    setError("");
-    setVoteOk("");
-    setLoadingSongs(true);
+    (async () => {
+      setError("");
+      try {
+        const url = `${API_BASE}/weeks/${week.id}/songs?filter=${encodeURIComponent(
+          filter
+        )}&search=${encodeURIComponent(search)}`;
 
-    const url =
-      `${API_BASE}/weeks/${week.id}/songs` +
-      `?filter=${filter}` +
-      `&search=${encodeURIComponent(search)}`;
-
-    fetch(url, {
-      headers: initData ? { "X-Telegram-Init-Data": initData } : {},
-    })
-      .then(async (r) => {
-        if (r.status === 403) throw new Error("Нужна подписка на @deerzone");
-        if (r.status === 401) throw new Error("Открой это через Telegram Mini App (initData отсутствует)");
-        if (!r.ok) throw new Error("Не удалось загрузить песни");
-        return r.json();
-      })
-      .then((data) => {
-        setSongs(Array.isArray(data) ? data : []);
-        // если список обновился — оставим selected только для существующих id
-        const existing = new Set((Array.isArray(data) ? data : []).map((x) => x.id));
-        setSelected((prev) => {
-          const next = new Set();
-          for (const id of prev) if (existing.has(id)) next.add(id);
-          return next;
+        const r = await fetch(url, {
+          headers: initData ? { "X-Telegram-Init-Data": initData } : {},
+          cache: "no-store",
         });
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoadingSongs(false));
-  }, [week, filter, search, initData]);
 
-  // SORT A-Z (artist, then title)
-  const sortedSongs = useMemo(() => {
-    const arr = Array.isArray(songs) ? [...songs] : [];
-    arr.sort((a, b) => {
-      const aa = `${a.artist || ""}`.toLowerCase();
-      const bb = `${b.artist || ""}`.toLowerCase();
-      if (aa < bb) return -1;
-      if (aa > bb) return 1;
-      const at = `${a.title || ""}`.toLowerCase();
-      const bt = `${b.title || ""}`.toLowerCase();
-      if (at < bt) return -1;
-      if (at > bt) return 1;
-      return 0;
-    });
-    return arr;
-  }, [songs]);
+        const parsed = await safeJson(r);
 
-  function toggleSong(id) {
+        if (!r.ok) {
+          const detail =
+            parsed.ok && parsed.data?.detail
+              ? parsed.data.detail
+              : parsed.ok
+              ? JSON.stringify(parsed.data)
+              : parsed.text;
+
+          // типовые случаи
+          if (r.status === 401) throw new Error("Открой это через Telegram Mini App (initData отсутствует)");
+          if (r.status === 403) throw new Error("Нужна подписка на @deerzone");
+
+          throw new Error(`API ошибка (${r.status}): ${detail}`);
+        }
+
+        if (!parsed.ok) throw new Error("API вернул не-JSON");
+
+        // важно: приводим к массиву
+        const arr = Array.isArray(parsed.data) ? parsed.data : [];
+        setSongs(arr);
+      } catch (e) {
+        setSongs([]);
+        setError(e?.message || "API недоступен");
+      }
+    })();
+  }, [week?.id, filter, search, initData]);
+
+  // аккуратно останавливаем аудио при смене страницы/размонтаже
+  useEffect(() => {
+    return () => {
+      try {
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current = null;
+        }
+      } catch {}
+    };
+  }, []);
+
+  function toggleSong(songId) {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(songId)) next.delete(songId);
+      else next.add(songId);
       return next;
     });
   }
 
-  function stopAudio() {
-    try {
-      if (audioObj) {
-        audioObj.pause();
-        audioObj.currentTime = 0;
-      }
-    } catch {}
-    setAudioObj(null);
-  }
-
-  function playPreview(e, s) {
-    e.stopPropagation();
-    setVoteOk("");
-    setError("");
-
-    // нет превью → открыть YouTube fallback
-    if (!s.preview_url) {
-      if (s.youtube_url) window.open(s.youtube_url, "_blank");
+  async function togglePreview(song) {
+    const url = song?.preview_url;
+    if (!url) {
+      alert("Нет превью для этой песни (пока).");
       return;
     }
 
-    // остановить предыдущий
-    stopAudio();
+    // если кликнули по той же песне — пауза/плей
+    if (playingId === song.id && audioRef.current) {
+      if (audioRef.current.paused) {
+        try {
+          await audioRef.current.play();
+        } catch {
+          alert("Не удалось запустить превью (браузер блокирует автозвук).");
+        }
+      } else {
+        audioRef.current.pause();
+      }
+      return;
+    }
 
+    // иначе: останавливаем прошлое и включаем новое
     try {
-      const a = new Audio(s.preview_url);
-      a.play().catch(() => {
-        if (s.youtube_url) window.open(s.youtube_url, "_blank");
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+
+      const a = new Audio(url);
+      audioRef.current = a;
+      setPlayingId(song.id);
+
+      a.addEventListener("ended", () => {
+        setPlayingId(null);
       });
 
-      // играем 15 секунд (можешь поменять на 10_000 или 30_000)
-      const t = setTimeout(() => {
-        try {
-          a.pause();
-          a.currentTime = 0;
-        } catch {}
-        clearTimeout(t);
-      }, 15000);
-
-      setAudioObj(a);
+      await a.play();
     } catch {
-      if (s.youtube_url) window.open(s.youtube_url, "_blank");
+      setPlayingId(null);
+      alert("Не удалось запустить превью (браузер блокирует автозвук).");
     }
   }
 
-  async function sendVote() {
+  async function vote() {
     if (!week?.id) return;
-    setVoteOk("");
     setError("");
 
-    const ids = Array.from(selected);
+    const song_ids = Array.from(selected);
 
-    setVoting(true);
     try {
       const r = await fetch(`${API_BASE}/weeks/${week.id}/vote`, {
         method: "POST",
@@ -196,116 +188,127 @@ export default function Home() {
           "Content-Type": "application/json",
           ...(initData ? { "X-Telegram-Init-Data": initData } : {}),
         },
-        body: JSON.stringify({ song_ids: ids }),
+        body: JSON.stringify({ song_ids }),
       });
 
-      if (r.status === 403) {
-        const t = await r.json().catch(() => null);
-        // может быть "VOTING_CLOSED" или "Нужна подписка..."
-        throw new Error(typeof t?.detail === "string" ? t.detail : "Нужна подписка на @deerzone или голосование закрыто");
-      }
-      if (r.status === 401) throw new Error("Открой это через Telegram Mini App (initData отсутствует)");
+      const parsed = await safeJson(r);
 
       if (!r.ok) {
-        const t = await r.json().catch(() => null);
-        throw new Error(typeof t?.detail === "string" ? t.detail : "Ошибка при голосовании");
+        const detail =
+          parsed.ok && parsed.data?.detail
+            ? parsed.data.detail
+            : parsed.ok
+            ? JSON.stringify(parsed.data)
+            : parsed.text;
+        throw new Error(`Ошибка голосования (${r.status}): ${detail}`);
       }
 
-      setVoteOk("Голос принят ✅ (если ты голосовал раньше — он обновлён)");
+      alert("Голос учтён ✅");
     } catch (e) {
-      setError(e.message || "Ошибка при голосовании");
-    } finally {
-      setVoting(false);
+      setError(e?.message || "Ошибка голосования");
     }
   }
 
-  // UI
   return (
-    <div style={{ maxWidth: 760, margin: "0 auto", padding: 18, fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Arial" }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-        <div>
-          <div style={{ fontSize: 26, fontWeight: 900, letterSpacing: -0.5 }}>#deerzone chart</div>
-          <div style={{ marginTop: 4, opacity: 0.75, fontWeight: 600 }}>
-            {loadingWeek ? "Загрузка недели..." : week ? week.title : "Неделя не загружена"}
-          </div>
-        </div>
+    <div style={{ maxWidth: 760, margin: "0 auto", padding: 16, fontFamily: "system-ui, -apple-system, Segoe UI, Roboto" }}>
+      <div style={{ height: 8, background: "#ff3fa4", borderRadius: 999 }} />
 
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            onClick={() => {
-              stopAudio();
-              setFilter("new");
-            }}
-            style={{
-              padding: "10px 12px",
-              borderRadius: 12,
-              border: filter === "new" ? "2px solid #ff3fa4" : "1px solid #eaeaea",
-              background: "#fff",
-              cursor: "pointer",
-              fontWeight: 800,
-            }}
-          >
-            New
-          </button>
-
-          <button
-            onClick={() => {
-              stopAudio();
-              setFilter("all");
-            }}
-            style={{
-              padding: "10px 12px",
-              borderRadius: 12,
-              border: filter === "all" ? "2px solid #ff3fa4" : "1px solid #eaeaea",
-              background: "#fff",
-              cursor: "pointer",
-              fontWeight: 800,
-            }}
-          >
-            All
-          </button>
-        </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginTop: 18 }}>
+        <div style={{ fontSize: 34, fontWeight: 900 }}>#deerzone chart</div>
+        <div style={{ fontSize: 16, opacity: 0.6 }}>{week?.title || ""}</div>
       </div>
 
-      <div style={{ marginTop: 12, display: "flex", gap: 10, alignItems: "center" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 18 }}>
+        <div style={{ fontSize: 18, fontWeight: 700 }}>
+          Selected: <span style={{ fontWeight: 900 }}>{selected.size}</span>
+        </div>
+
+        <button
+          onClick={vote}
+          disabled={!week?.id}
+          style={{
+            padding: "10px 16px",
+            borderRadius: 14,
+            border: "1px solid #eaeaea",
+            background: "#fff",
+            fontWeight: 800,
+            cursor: week?.id ? "pointer" : "not-allowed",
+            opacity: week?.id ? 1 : 0.5,
+          }}
+        >
+          VOTE
+        </button>
+      </div>
+
+      <div style={{ marginTop: 14 }}>
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Поиск (artist или title)"
+          placeholder="Search artist or title"
           style={{
-            flex: 1,
+            width: "100%",
             padding: "12px 14px",
             borderRadius: 14,
             border: "1px solid #eaeaea",
             outline: "none",
-            fontSize: 14,
+            fontSize: 16,
           }}
         />
+      </div>
 
-        <div style={{ padding: "12px 14px", borderRadius: 14, border: "1px solid #eaeaea", background: "#fff", fontWeight: 800 }}>
-          A–Z
-        </div>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 12 }}>
+        <button
+          onClick={() => setFilter("new")}
+          style={{
+            padding: "10px 14px",
+            borderRadius: 999,
+            border: filter === "new" ? "2px solid #ff3fa4" : "1px solid #eaeaea",
+            background: filter === "new" ? "rgba(255,63,164,0.08)" : "#fff",
+            cursor: "pointer",
+            fontWeight: 800,
+          }}
+        >
+          New
+        </button>
+
+        <button
+          onClick={() => setFilter("all")}
+          style={{
+            padding: "10px 14px",
+            borderRadius: 999,
+            border: filter === "all" ? "2px solid #ff3fa4" : "1px solid #eaeaea",
+            background: filter === "all" ? "rgba(255,63,164,0.08)" : "#fff",
+            cursor: "pointer",
+            fontWeight: 800,
+          }}
+        >
+          All
+        </button>
+
+        <div style={{ marginLeft: "auto", opacity: 0.5, fontWeight: 700 }}>A–Z</div>
       </div>
 
       {error ? (
-        <div style={{ marginTop: 12, padding: 12, borderRadius: 14, border: "1px solid #ffd6e8", background: "rgba(255,63,164,0.06)", fontWeight: 700 }}>
-          {error}
-        </div>
-      ) : null}
-
-      {voteOk ? (
-        <div style={{ marginTop: 12, padding: 12, borderRadius: 14, border: "1px solid #d8ffe7", background: "rgba(0,200,100,0.08)", fontWeight: 700 }}>
-          {voteOk}
+        <div
+          style={{
+            marginTop: 14,
+            padding: 12,
+            borderRadius: 14,
+            border: "1px solid rgba(255,63,164,0.35)",
+            background: "rgba(255,63,164,0.08)",
+            color: "#222",
+            fontWeight: 700,
+          }}
+        >
+          {String(error)}
         </div>
       ) : null}
 
       <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-        {loadingSongs ? (
-          <div style={{ opacity: 0.7, fontWeight: 700 }}>Загрузка песен...</div>
-        ) : (
-          Array.isArray(sortedSongs) &&
-          sortedSongs.map((s) => {
+        {Array.isArray(songs) &&
+          songs.map((s) => {
             const isSel = selected.has(s.id);
+            const isPlaying = playingId === s.id && audioRef.current && !audioRef.current.paused;
 
             return (
               <div
@@ -322,6 +325,7 @@ export default function Home() {
                   cursor: "pointer",
                 }}
               >
+                {/* cover */}
                 <div
                   style={{
                     width: 92,
@@ -335,94 +339,54 @@ export default function Home() {
                   }}
                 >
                   {s.cover ? (
-                    <img src={s.cover} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  ) : null}
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={s.cover}
+                      alt=""
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    />
+                  ) : (
+                    <div style={{ fontSize: 12, opacity: 0.5, fontWeight: 800 }}>NO COVER</div>
+                  )}
                 </div>
 
+                {/* info */}
                 <div>
-                  <div style={{ fontSize: 18, fontWeight: 900, lineHeight: 1.1 }}>{s.title}</div>
+                  <div style={{ fontSize: 18, fontWeight: 900, lineHeight: 1.15 }}>{s.title}</div>
                   <div style={{ fontSize: 14, fontWeight: 700, opacity: 0.7, marginTop: 4 }}>{s.artist}</div>
 
-                  <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 10 }}>
                     <button
-                      onClick={(e) => playPreview(e, s)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        togglePreview(s);
+                      }}
                       style={{
                         padding: "8px 12px",
                         borderRadius: 12,
                         border: "1px solid #eaeaea",
                         background: "#fff",
                         cursor: "pointer",
-                        fontWeight: 800,
+                        fontWeight: 900,
                       }}
                     >
-                      ▶ Preview
+                      {isPlaying ? "⏸ Pause" : "▶ Preview"}
                     </button>
 
-                    {!s.preview_url && s.youtube_url ? (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          window.open(s.youtube_url, "_blank");
-                        }}
-                        style={{
-                          padding: "8px 12px",
-                          borderRadius: 12,
-                          border: "1px solid #eaeaea",
-                          background: "#fff",
-                          cursor: "pointer",
-                          fontWeight: 800,
-                        }}
-                      >
-                        YouTube
-                      </button>
+                    {!s.preview_url ? (
+                      <span style={{ fontSize: 12, opacity: 0.55, fontWeight: 700 }}>
+                        (превью нет)
+                      </span>
                     ) : null}
                   </div>
                 </div>
               </div>
             );
-          })
-        )}
+          })}
       </div>
 
-      <div style={{ marginTop: 16, display: "flex", gap: 10, alignItems: "center" }}>
-        <button
-          disabled={voting}
-          onClick={sendVote}
-          style={{
-            flex: 1,
-            padding: "14px 14px",
-            borderRadius: 16,
-            border: "1px solid #ff3fa4",
-            background: "#ff3fa4",
-            color: "#fff",
-            cursor: voting ? "not-allowed" : "pointer",
-            fontWeight: 900,
-            fontSize: 16,
-          }}
-        >
-          {voting ? "Отправляю..." : `VOTE (${selected.size})`}
-        </button>
-
-        <button
-          onClick={() => {
-            stopAudio();
-            setSelected(new Set());
-          }}
-          style={{
-            padding: "14px 14px",
-            borderRadius: 16,
-            border: "1px solid #eaeaea",
-            background: "#fff",
-            cursor: "pointer",
-            fontWeight: 900,
-          }}
-        >
-          Clear
-        </button>
-      </div>
-
-      <div style={{ marginTop: 18, opacity: 0.6, fontSize: 12, lineHeight: 1.35 }}>
-        В браузере может работать не полностью. В Telegram Mini App передаётся initData (это нужно для ограничений и подписки).
+      <div style={{ marginTop: 18, opacity: 0.6, fontSize: 12 }}>
+        Сейчас ты открыл это в браузере. Полноценно будет работать, когда откроешь как Telegram Mini App (нужно initData).
       </div>
     </div>
   );
