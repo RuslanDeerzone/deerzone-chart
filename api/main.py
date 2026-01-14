@@ -9,8 +9,53 @@ import requests
 from fastapi import FastAPI, Header, HTTPException, Body, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import json
+from pathlib import Path
+
+# ===== SONGS STORAGE =====
+BASE_DIR = Path(__file__).resolve().parent   # папка api/
+SONGS_PATH = BASE_DIR / "songs.json"
+
+SONGS_BY_WEEK: Dict[int, list] = {}
+
+def load_songs_from_file():
+    global SONGS_BY_WEEK
+
+    if not SONGS_PATH.exists():
+        print(f"SONGS: file not found: {SONGS_PATH}")
+        SONGS_BY_WEEK = {}
+        return
+
+    try:
+        raw = json.loads(SONGS_PATH.read_text(encoding="utf-8"))
+        data: Dict[int, list] = {}
+
+        for k, v in raw.items():
+            try:
+                week_id = int(k)
+            except ValueError:
+                continue
+
+            if isinstance(v, list):
+                data[week_id] = v
+            else:
+                data[week_id] = []
+
+        SONGS_BY_WEEK = data
+        print(
+            f"SONGS: loaded weeks={len(SONGS_BY_WEEK)} "
+            f"total={sum(len(v) for v in SONGS_BY_WEEK.values())}"
+        )
+
+    except Exception as e:
+        print("SONGS: FAILED TO LOAD")
+        print(e)
+        SONGS_BY_WEEK = {}
 
 app = FastAPI()
+@app.on_event("startup")
+def startup_event():
+    load_songs_from_file()
 
 # ✅ CORS для WEB + Telegram Mini App
 app.add_middleware(
