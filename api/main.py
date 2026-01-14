@@ -18,48 +18,29 @@ SONGS_PATH = BASE_DIR / "songs.json"
 
 SONGS_BY_WEEK: Dict[int, list] = {}
 
-def load_songs_from_file():
-    global SONGS_BY_WEEK
+import os
+import json
 
-    if not SONGS_PATH.exists():
-        print(f"SONGS: file not found: {SONGS_PATH}", flush=True)
-        SONGS_BY_WEEK = {}
-        return
+def load_songs_from_file() -> list[dict]:
+    # Абсолютный путь к api/songs.json
+    base_dir = os.path.dirname(__file__)
+    path = os.path.join(base_dir, "songs.json")
+
+    if not os.path.exists(path):
+        print(f"[BOOT] songs.json NOT FOUND: {path}")
+        return []
 
     try:
-        raw = json.loads(SONGS_PATH.read_text(encoding="utf-8"))
-
-        # ✅ Вариант 1: файл = список песен -> кладём в текущую неделю
-        if isinstance(raw, list):
-            week_id = get_current_week()["id"]  # у тебя сейчас 3
-            SONGS_BY_WEEK = {week_id: raw}
-            print(f"SONGS: loaded list into week {week_id}, count={len(raw)}", flush=True)
-            return
-
-        # ✅ Вариант 2: файл = словарь { "3": [..], "4":[..] }
-        if isinstance(raw, dict):
-            data: Dict[int, list] = {}
-            for k, v in raw.items():
-                try:
-                    wk = int(k)
-                except ValueError:
-                    continue
-                data[wk] = v if isinstance(v, list) else []
-            SONGS_BY_WEEK = data
-            print(
-                f"SONGS: loaded weeks={len(SONGS_BY_WEEK)} total={sum(len(v) for v in SONGS_BY_WEEK.values())}",
-                flush=True,
-            )
-            return
-
-        # ❌ неизвестный формат
-        print(f"SONGS: unsupported json format: {type(raw)}", flush=True)
-        SONGS_BY_WEEK = {}
-
-    except Exception:
-        print("SONGS: FAILED TO LOAD", flush=True)
-        print(traceback.format_exc(), flush=True)
-        SONGS_BY_WEEK = {}
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, list):
+            print(f"[BOOT] songs.json is not a list, got: {type(data)}")
+            return []
+        print(f"[BOOT] songs.json loaded: {len(data)} items")
+        return data
+    except Exception as e:
+        print(f"[BOOT] songs.json FAILED to load: {e}")
+        return []
 
 app = FastAPI()
 @app.on_event("startup")
