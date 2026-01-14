@@ -72,9 +72,7 @@ useEffect(() => {
       const f = filter === "new" ? "new" : "all";
       const q = typeof search === "string" ? search : "";
 
-      const url =
-        ${API_BASE}/weeks/${week.id}/songs +
-        ?filter=${f}&search=${encodeURIComponent(q)};
+      const url = ${API_BASE}/weeks/${week.id}/songs?filter=${f}&search=${encodeURIComponent(q)};
 
       const r = await fetch(url, {
         cache: "no-store",
