@@ -2,15 +2,15 @@ import os
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN")
 import re
 import time
-from typing import List, Optional, Dict, Literal
+import json
 import traceback
+from pathlib import Path
+from typing import List, Optional, Dict, Literal
 
 import requests
-from fastapi import FastAPI, Header, HTTPException, Body, Response, Request
+from fastapi import FastAPI, Header, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import json
-from pathlib import Path
 
 # ===== SONGS STORAGE =====
 BASE_DIR = Path(__file__).resolve().parent   # папка api/
@@ -22,34 +22,43 @@ def load_songs_from_file():
     global SONGS_BY_WEEK
 
     if not SONGS_PATH.exists():
-        print(f"SONGS: file not found: {SONGS_PATH}")
+        print(f"SONGS: file not found: {SONGS_PATH}", flush=True)
         SONGS_BY_WEEK = {}
         return
 
     try:
         raw = json.loads(SONGS_PATH.read_text(encoding="utf-8"))
-        data: Dict[int, list] = {}
 
-        for k, v in raw.items():
-            try:
-                week_id = int(k)
-            except ValueError:
-                continue
+        # ✅ Вариант 1: файл = список песен -> кладём в текущую неделю
+        if isinstance(raw, list):
+            week_id = get_current_week()["id"]  # у тебя сейчас 3
+            SONGS_BY_WEEK = {week_id: raw}
+            print(f"SONGS: loaded list into week {week_id}, count={len(raw)}", flush=True)
+            return
 
-            if isinstance(v, list):
-                data[week_id] = v
-            else:
-                data[week_id] = []
+        # ✅ Вариант 2: файл = словарь { "3": [..], "4":[..] }
+        if isinstance(raw, dict):
+            data: Dict[int, list] = {}
+            for k, v in raw.items():
+                try:
+                    wk = int(k)
+                except ValueError:
+                    continue
+                data[wk] = v if isinstance(v, list) else []
+            SONGS_BY_WEEK = data
+            print(
+                f"SONGS: loaded weeks={len(SONGS_BY_WEEK)} total={sum(len(v) for v in SONGS_BY_WEEK.values())}",
+                flush=True,
+            )
+            return
 
-        SONGS_BY_WEEK = data
-        print(
-            f"SONGS: loaded weeks={len(SONGS_BY_WEEK)} "
-            f"total={sum(len(v) for v in SONGS_BY_WEEK.values())}"
-        )
+        # ❌ неизвестный формат
+        print(f"SONGS: unsupported json format: {type(raw)}", flush=True)
+        SONGS_BY_WEEK = {}
 
-    except Exception as e:
-        print("SONGS: FAILED TO LOAD")
-        print(e)
+    except Exception:
+        print("SONGS: FAILED TO LOAD", flush=True)
+        print(traceback.format_exc(), flush=True)
         SONGS_BY_WEEK = {}
 
 app = FastAPI()
