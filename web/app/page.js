@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 
 function getInitDataSafe() {
   if (typeof window === "undefined") return "";
@@ -26,6 +25,9 @@ export default function Home() {
   const [songs, setSongs] = useState([]);
   const [selected, setSelected] = useState(new Set());
   const [error, setError] = useState("");
+
+  const [sendingVote, setSendingVote] = useState(false);
+  const [voteMsg, setVoteMsg] = useState("");
 
   // audio preview
   const audioRef = useRef(null);
@@ -56,46 +58,45 @@ export default function Home() {
         setWeek(parsed.data);
       } catch (e) {
         console.error(e);
-        setError("Не удалось загрузить список");
+        setError("Не удалось загрузить неделю");
       }
     })();
   }, [initData]);
 
-// 2) грузим песни недели
-useEffect(() => {
-  if (!week?.id) return;
+  // 2) грузим песни недели
+  useEffect(() => {
+    if (!week?.id) return;
 
-  (async () => {
-    try {
-      setError("");
+    (async () => {
+      try {
+        setError("");
+        const f = filter === "new" ? "new" : "all";
+        const q = typeof search === "string" ? search : "";
 
-      const f = filter === "new" ? "new" : "all";
-      const q = typeof search === "string" ? search : "";
+        const url = `${API_BASE}/weeks/${week.id}/songs?filter=${f}&search=${encodeURIComponent(
+          q
+        )}`;
 
-      const url = `${API_BASE}/weeks/${week.id}/songs?filter=${f}&search=${encodeURIComponent(q)}`;
+        const r = await fetch(url, {
+          cache: "no-store",
+          headers: initData ? { "X-Telegram-Init-Data": initData } : {},
+        });
 
-      const r = await fetch(url, {
-        cache: "no-store",
-        headers: initData
-          ? { "X-Telegram-Init-Data": initData }
-          : {},
-      });
+        if (!r.ok) {
+          const parsed = await safeJson(r);
+          const detail = parsed.ok ? JSON.stringify(parsed.data) : parsed.text;
+          throw new Error(`HTTP ${r.status}: ${detail}`);
+        }
 
-      if (!r.ok) {
-        throw new Error(`HTTP ${r.status}`);
+        const data = await r.json();
+        setSongs(Array.isArray(data) ? data : []);
+      } catch (e) {
+        console.error(e);
+        setSongs([]);
+        setError("Не удалось загрузить список");
       }
-
-      const data = await r.json();
-
-      // ВАЖНО: API возвращает массив
-      setSongs(Array.isArray(data) ? data : []);
-    } catch (e) {
-      console.error(e);
-      setSongs([]);
-      setError("Не удалось загрузить список");
-    }
-  })();
-}, [week?.id, filter, search, initData]);
+    })();
+  }, [week?.id, filter, search, initData]);
 
   // аккуратно останавливаем аудио при размонтаже
   useEffect(() => {
@@ -110,6 +111,7 @@ useEffect(() => {
   }, []);
 
   function toggleSong(id) {
+    setVoteMsg("");
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -129,7 +131,6 @@ useEffect(() => {
 
   async function playPreview(song) {
     try {
-      // если уже играет это же — остановить
       if (playingId === song.id) {
         stopAudio();
         return;
@@ -152,7 +153,6 @@ useEffect(() => {
         return;
       }
 
-      // фолбэк: открыть YouTube поиск
       if (song?.youtube_url) {
         window.open(song.youtube_url, "_blank");
         return;
@@ -165,43 +165,90 @@ useEffect(() => {
     }
   }
 
+  async function submitVote() {
+    try {
+      setError("");
+      setVoteMsg("");
+
+      if (!week?.id) {
+        setError("Нет текущей недели");
+        return;
+      }
+
+      const ids = Array.from(selected);
+      if (ids.length === 0) return;
+
+      setSendingVote(true);
+
+      const init = getInitDataSafe() || "dev";
+      const url = `${API_BASE}/weeks/${week.id}/vote`;
+
+      const r = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Telegram-Init-Data": init,
+        },
+        body: JSON.stringify({ song_ids: ids }),
+      });
+
+      const parsed = await safeJson(r);
+
+      if (!r.ok) {
+        const detail = parsed.ok ? JSON.stringify(parsed.data) : parsed.text;
+        setError(`Ошибка голосования (${r.status}): ${detail}`);
+        return;
+      }
+
+      setVoteMsg("Голос учтён ✅");
+    } catch (e) {
+      console.error(e);
+      setError("Не удалось отправить голос");
+    } finally {
+      setSendingVote(false);
+    }
+  }
+
   const selectedCount = selected.size;
 
   return (
     <div
-  style={{
-    maxWidth: 760,
-    margin: "0 auto",
-    padding: 18,
-    fontFamily:
-      "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, Arial, sans-serif"
-  }}
->
+      style={{
+        maxWidth: 760,
+        margin: "0 auto",
+        padding: 18,
+        fontFamily:
+          "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, Arial, sans-serif",
+      }}
+    >
       <div style={{ height: 8, background: "#ff3fa4", borderRadius: 99 }} />
 
-      <div style={{ marginTop: 18, fontSize: 44, fontWeight: 900 }}>
-        #deerzone chart
-      </div>
+      <div style={{ marginTop: 18, fontSize: 44, fontWeight: 900 }}>#deerzone chart</div>
 
       <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ fontSize: 22, fontWeight: 800 }}>Selected: {selectedCount}</div>
 
         <button
-          disabled={selectedCount === 0}
+          disabled={selectedCount === 0 || sendingVote}
           style={{
             marginLeft: "auto",
             padding: "10px 14px",
             borderRadius: 14,
             border: "1px solid #eaeaea",
-            background: selectedCount === 0 ? "#f5f5f5" : "#fff",
-            cursor: selectedCount === 0 ? "not-allowed" : "pointer",
-            fontWeight: 800,
+            background: selectedCount === 0 || sendingVote ? "#f5f5f5" : "#111",
+            color: selectedCount === 0 || sendingVote ? "#999" : "#fff",
+            cursor: selectedCount === 0 || sendingVote ? "not-allowed" : "pointer",
+            fontWeight: 900,
           }}
-          onClick={() => alert("VOTE подключим следующим шагом")}
+          onClick={submitVote}
         >
-          VOTE
+          {sendingVote ? "SENDING..." : "VOTE"}
         </button>
       </div>
+
+      {voteMsg ? (
+        <div style={{ marginTop: 10, fontWeight: 900, opacity: 0.9 }}>{voteMsg}</div>
+      ) : null}
 
       <input
         value={search}
