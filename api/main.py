@@ -294,7 +294,17 @@ def weeks_songs(
     except Exception:
         pass
 
-    ensure_week_exists(week_id)
+def ensure_week_exists(week_id: int):
+    # если неделя уже загружена в память — ничего не делаем
+    if week_id in SONGS_BY_WEEK and isinstance(SONGS_BY_WEEK[week_id], list) and len(SONGS_BY_WEEK[week_id]) > 0:
+        return
+
+    # если ещё не загружена — подгружаем из файла и кладём в эту неделю
+    items = load_songs_from_file()
+    items = normalize_songs(items)
+
+    SONGS_BY_WEEK[week_id] = items
+    print(f"[BOOT/ENSURE] week_id={week_id} loaded={len(items)}", flush=True)
 
     # ✅ ВАЖНО: берём только из SONGS_BY_WEEK
     items = SONGS_BY_WEEK.get(week_id, [])
