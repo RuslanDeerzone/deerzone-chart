@@ -274,6 +274,7 @@ def startup_event():
     items = normalize_songs(items)
     SONGS_BY_WEEK[CURRENT_WEEK_ID] = items
 
+    print(f"[STARTUP] app_id={id(app)} starting...", flush=True)
     print(f"[BOOT] CURRENT_WEEK_ID={CURRENT_WEEK_ID}", flush=True)
     print(f"[BOOT] SONGS_PATH={SONGS_PATH} exists={SONGS_PATH.exists()}", flush=True)
     print(f"[BOOT] SONGS_COUNT={len(SONGS_BY_WEEK.get(CURRENT_WEEK_ID, []))}", flush=True)
@@ -448,3 +449,6 @@ def admin_enrich_current_week(
         "skipped": skipped,
         "errors": errors,
     }
+
+print(f"[BOOT-CHECK] app_id={id(app)}", flush=True)
+print(f"[BOOT-CHECK] weeks={list(SONGS_BY_WEEK.keys())} count={len(SONGS_BY_WEEK.get(CURRENT_WEEK_ID, []))}", flush=True)
