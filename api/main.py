@@ -86,28 +86,33 @@ def cors_preflight(path: str):
 # =========================
 # Helpers: robust storage
 # =========================
-def _atomic_write_json(path: Path, data: Any) -> None:
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+def atomic_write_json(path: Path, data: Any) -> None:
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2),
+        encoding="utf-8"   # ← без BOM при записи
+    )
     tmp.replace(path)
 
 
-def load_songs_from_file() -> List[Dict[str, Any]]:
+def load_songs_from_file() -> list[dict]:
     if not SONGS_PATH.exists():
         print(f"[BOOT] songs.json NOT FOUND: {SONGS_PATH}", flush=True)
         return []
+
     try:
-        raw = SONGS_PATH.read_text(encoding="utf-8")
-        data = json.loads(raw)
+        text = SONGS_PATH.read_text(encoding="utf-8-sig")  # ← КЛЮЧЕВО
+        data = json.loads(text)
+
         if not isinstance(data, list):
             print(f"[BOOT] songs.json is not list, got {type(data)}", flush=True)
             return []
+
         print(f"[BOOT] songs.json loaded: {len(data)} items", flush=True)
         return data
+
     except Exception as e:
-        print(f"[BOOT] songs.json FAILED to load: {e}", flush=True)
-        print(traceback.format_exc(), flush=True)
+        print(f"[BOOT] songs.json FAILED: {e}", flush=True)
         return []
 
 
@@ -271,13 +276,11 @@ def itunes_search_track(artist: str, title: str) -> Optional[Tuple[str, str]]:
 @app.on_event("startup")
 def startup_event():
     items = load_songs_from_file()
-    items = normalize_songs(items)
     SONGS_BY_WEEK[CURRENT_WEEK_ID] = items
 
-    print(f"[STARTUP] app_id={id(app)} starting...", flush=True)
     print(f"[BOOT] CURRENT_WEEK_ID={CURRENT_WEEK_ID}", flush=True)
     print(f"[BOOT] SONGS_PATH={SONGS_PATH} exists={SONGS_PATH.exists()}", flush=True)
-    print(f"[BOOT] SONGS_COUNT={len(SONGS_BY_WEEK.get(CURRENT_WEEK_ID, []))}", flush=True)
+    print(f"[BOOT] SONGS_COUNT={len(items)}", flush=True)
 
 
 # =========================
