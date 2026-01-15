@@ -288,21 +288,27 @@ def weeks_songs(
     search: str = "",
     x_telegram_init_data: Optional[str] = Header(default=None),
 ):
-    _ = user_id_from_telegram_init_data(x_telegram_init_data)
+    # auth (в Mini App initData есть; для браузера/PS допускаем пустое)
+    try:
+        _ = user_id_from_telegram_init_data(x_telegram_init_data)
+    except Exception:
+        pass
+
     ensure_week_exists(week_id)
 
+    # ✅ ВАЖНО: берём только из SONGS_BY_WEEK
     items = SONGS_BY_WEEK.get(week_id, [])
+    if not isinstance(items, list):
+        items = []
+
     if filter == "new":
-        items = [s for s in items if bool(s.get("is_new"))]
+        items = [s for s in items if getattr(s, "is_new", False)]
 
     if search.strip():
         q = search.strip().lower()
-        items = [s for s in items if q in f"{s.get('artist','')} {s.get('title','')}".lower()]
+        items = [s for s in items if q in (f"{s.artist} {s.title}".lower())]
 
-    # sort A-Z (artist + title)
-    items = sorted(items, key=lambda s: (s.get("artist", "").lower(), s.get("title", "").lower()))
-
-    return [SongOut(**s) for s in items]
+    return items
 
 
 @app.get("/weeks/{week_id}/results")
