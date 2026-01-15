@@ -478,6 +478,36 @@ def debug_songs_count():
     except Exception as e:
         return {"error": str(e)}
 
+@app.get("/__debug/songs_file")
+def debug_songs_file():
+    try:
+        import json as _json
+        p = SONGS_PATH
+        raw = p.read_text(encoding="utf-8") if p.exists() else ""
+        head = raw[:200]
+
+        j = None
+        top = None
+        count = None
+        try:
+            j = _json.loads(raw) if raw else None
+            top = type(j).__name__ if j is not None else None
+            count = len(j) if isinstance(j, list) else None
+        except Exception as e:
+            top = f"json_error: {e}"
+
+        return {
+            "path": str(p),
+            "exists": p.exists(),
+            "size": p.stat().st_size if p.exists() else None,
+            "top_type": top,
+            "list_count": count,
+            "head": head,
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
 try:
     print(f"[BOOT-CHECK] app_id={id(app)}", flush=True)
     print(
