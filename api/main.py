@@ -448,6 +448,25 @@ def admin_enrich_current_week(
         "updated": updated,
         "skipped": skipped,
         "errors": errors,
+
+
+@app.get("/__debug/songs_path")
+def debug_songs_path():
+    return {
+        "cwd": os.getcwd(),
+        "file": str(SONGS_PATH),
+        "exists": SONGS_PATH.exists(),
+        "size": SONGS_PATH.stat().st_size if SONGS_PATH.exists() else None,
+    }
+
+@app.get("/__debug/songs_count")
+def debug_songs_count():
+    items = SONGS_BY_WEEK.get(CURRENT_WEEK_ID, [])
+    return {
+        "current_week_id": CURRENT_WEEK_ID,
+        "weeks_keys": list(SONGS_BY_WEEK.keys()),
+        "count": len(items) if isinstance(items, list) else None,
+        "first": items[0] if isinstance(items, list) and len(items) > 0 else None,
     }
 
 print(f"[BOOT-CHECK] app_id={id(app)}", flush=True)
