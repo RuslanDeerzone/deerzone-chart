@@ -1,0 +1,321 @@
+[
+  {
+    "artist": "EXO",
+    "title": "I'm Home",
+    "weeks_in_chart": 4,
+    "is_new": false,
+    "source": "carryover",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "MINHO (SHINee)",
+    "title": "TEMPO",
+    "weeks_in_chart": 4,
+    "is_new": false,
+    "source": "carryover",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "Stray Kids",
+    "title": "Do It",
+    "weeks_in_chart": 8,
+    "is_new": false,
+    "source": "carryover",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "ITZY",
+    "title": "TUNNEL VISION",
+    "weeks_in_chart": 9,
+    "is_new": false,
+    "source": "carryover",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "Stray Kids",
+    "title": "DIVINE",
+    "weeks_in_chart": 6,
+    "is_new": false,
+    "source": "carryover",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "BABYMONSTER",
+    "title": "PSYCHO",
+    "weeks_in_chart": 5,
+    "is_new": false,
+    "source": "carryover",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "Bang Chan (Stray Kids)",
+    "title": "Roman Empire",
+    "weeks_in_chart": 9,
+    "is_new": false,
+    "source": "carryover",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "ALLDAY PROJECT",
+    "title": "LOOK AT ME",
+    "weeks_in_chart": 4,
+    "is_new": false,
+    "source": "carryover",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "ILLIT",
+    "title": "NOT CUTE ANYMORE",
+    "weeks_in_chart": 6,
+    "is_new": false,
+    "source": "carryover",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "Seonghwa (ATEEZ)",
+    "title": "Skin",
+    "weeks_in_chart": 2,
+    "is_new": true,
+    "source": "carryover",
+    "cover": null,
+    "preview_url": null
+  },
+
+  {
+    "artist": "Re:Hearts",
+    "title": "Persona",
+    "weeks_in_chart": 1,
+    "is_new": true,
+    "source": "new",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "Apink",
+    "title": "Love Me More",
+    "weeks_in_chart": 1,
+    "is_new": true,
+    "source": "new",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "JOOHONEY (MONSTA X)",
+    "title": "STING",
+    "weeks_in_chart": 1,
+    "is_new": true,
+    "source": "new",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "idntt",
+    "title": "Pretty Boy Swag",
+    "weeks_in_chart": 1,
+    "is_new": true,
+    "source": "new",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "H1-KEY",
+    "title": "The World Isn’t Like a Movie",
+    "weeks_in_chart": 1,
+    "is_new": true,
+    "source": "new",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "1MILLION",
+    "title": "AT US",
+    "weeks_in_chart": 1,
+    "is_new": true,
+    "source": "new",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "CNBLUE",
+    "title": "Killer Joy",
+    "weeks_in_chart": 1,
+    "is_new": true,
+    "source": "new",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "CHUU",
+    "title": "XO, My Cyberlove",
+    "weeks_in_chart": 1,
+    "is_new": true,
+    "source": "new",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "BADA",
+    "title": "Our Loud Goodbye",
+    "weeks_in_chart": 1,
+    "is_new": true,
+    "source": "new",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "Shin Soohyun (UKISS)",
+    "title": "Gray",
+    "weeks_in_chart": 1,
+    "is_new": true,
+    "source": "new",
+    "cover": null,
+    "preview_url": null
+  },
+
+  {
+    "artist": "DynamicDuo feat. Sunghoon (ENHYPEN)",
+    "title": "Watch It, Feel It",
+    "weeks_in_chart": 1,
+    "is_new": true,
+    "source": "new",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "JIMIN",
+    "title": "0108",
+    "weeks_in_chart": 1,
+    "is_new": true,
+    "source": "new",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "WAKER",
+    "title": "LiKE THAT",
+    "weeks_in_chart": 1,
+    "is_new": true,
+    "source": "new",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "LATENCY",
+    "title": "it was love",
+    "weeks_in_chart": 1,
+    "is_new": true,
+    "source": "new",
+    "cover": null,
+    "preview_url": null
+  },
+
+  {
+    "artist": "ZICO & Crush",
+    "title": "Yin and Yang (SMTM12)",
+    "weeks_in_chart": 1,
+    "is_new": true,
+    "source": "new",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "GRAY & Loco",
+    "title": "PAPER (SMTM12)",
+    "weeks_in_chart": 1,
+    "is_new": true,
+    "source": "new",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "J-Tong & Hukky Shibaseki",
+    "title": "Cockroaches (SMTM12)",
+    "weeks_in_chart": 1,
+    "is_new": true,
+    "source": "new",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "Lil Moshpit & Jay Park",
+    "title": "GOAT (SMTM12)",
+    "weeks_in_chart": 1,
+    "is_new": true,
+    "source": "new",
+    "cover": null,
+    "preview_url": null
+  },
+
+  {
+    "artist": "DIA (AWU)",
+    "title": "Dance!",
+    "weeks_in_chart": 1,
+    "is_new": true,
+    "source": "new",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "ZEROBASEONE",
+    "title": "Running to Future",
+    "weeks_in_chart": 1,
+    "is_new": true,
+    "source": "new",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "COMMA",
+    "title": "Toxic Sugar",
+    "weeks_in_chart": 1,
+    "is_new": true,
+    "source": "new",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "YOUNG POSSE × BENZO",
+    "title": "LOSE YOUR SHXT",
+    "weeks_in_chart": 1,
+    "is_new": true,
+    "source": "new",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "Park Gunwook (ZEROBASEONE)",
+    "title": "Day After Day",
+    "weeks_in_chart": 1,
+    "is_new": true,
+    "source": "new",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "HADES",
+    "title": "Planet B",
+    "weeks_in_chart": 1,
+    "is_new": true,
+    "source": "new",
+    "cover": null,
+    "preview_url": null
+  },
+  {
+    "artist": "HA SUNG WOONG",
+    "title": "Tell The World",
+    "weeks_in_chart": 1,
+    "is_new": true,
+    "source": "new",
+    "cover": null,
+    "preview_url": null
+  }
+]
