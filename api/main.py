@@ -13,41 +13,45 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # ===== SONGS STORAGE =====
-BASE_DIR = Path(__file__).resolve().parent   # папка api/
+BASE_DIR = Path(__file__).resolve().parent  # папка api/
 SONGS_PATH = BASE_DIR / "songs.json"
 
-SONGS_BY_WEEK: Dict[int, list] = {}
+CURRENT_WEEK_ID = int(os.getenv("CURRENT_WEEK_ID", "3"))
 
-import os
-import json
+# week_id -> list[dict]
+SONGS_BY_WEEK: Dict[int, List[dict]] = {}
 
-def load_songs_from_file() -> list[dict]:
-    # Абсолютный путь к api/songs.json
-    base_dir = os.path.dirname(__file__)
-    path = os.path.join(base_dir, "songs.json")
 
-    if not os.path.exists(path):
-        print(f"[BOOT] songs.json NOT FOUND: {path}")
+def load_songs_from_file() -> List[dict]:
+    """Читает api/songs.json (список песен) и возвращает list[dict]."""
+    if not SONGS_PATH.exists():
+        print(f"[BOOT] songs.json NOT FOUND: {SONGS_PATH}", flush=True)
         return []
 
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        data = json.loads(SONGS_PATH.read_text(encoding="utf-8"))
         if not isinstance(data, list):
-            print(f"[BOOT] songs.json is not a list, got: {type(data)}")
+            print(f"[BOOT] songs.json is not a list, got: {type(data)}", flush=True)
             return []
-        print(f"[BOOT] songs.json loaded: {len(data)} items")
+        print(f"[BOOT] songs.json loaded: {len(data)} items", flush=True)
         return data
     except Exception as e:
-        print(f"[BOOT] songs.json FAILED to load: {e}")
+        print(f"[BOOT] songs.json FAILED to load: {e}", flush=True)
         return []
 
+
 app = FastAPI()
+
+
 @app.on_event("startup")
 def startup_event():
-    load_songs_from_file()
-print(f"SONGS_PATH = {SONGS_PATH} exists={SONGS_PATH.exists()}", flush=True)
-print(f"SONGS_WEEKS = {list(SONGS_BY_WEEK.keys())}", flush=True)
+    # ✅ КЛЮЧЕВОЕ: кладём список в нужную неделю
+    SONGS_BY_WEEK[CURRENT_WEEK_ID] = load_songs_from_file()
+
+    print(f"[BOOT] CURRENT_WEEK_ID={CURRENT_WEEK_ID}", flush=True)
+    print(f"[BOOT] SONGS_PATH={SONGS_PATH} exists={SONGS_PATH.exists()}", flush=True)
+    print(f"[BOOT] SONGS_COUNT={len(SONGS_BY_WEEK.get(CURRENT_WEEK_ID, []))}", flush=True)
+
 
 # ✅ CORS для WEB + Telegram Mini App
 app.add_middleware(
@@ -88,35 +92,33 @@ def admin_enrich_current_week(
         skipped = 0
         processed = 0
 
-        for s in items:
-            processed += 1
+    for s in items:
+    processed += 1
 
-            cover = getattr(s, "cover", None)
-            preview = getattr(s, "preview_url", None)
+    artist = s.get("artist", "")
+    title = s.get("title", "")
 
-            if not force and (cover or preview):
-                skipped += 1
-                continue
+    cover = s.get("cover")
+    preview = s.get("preview_url")
 
-            print(f"ENRICH: trying {s.artist} – {s.title} (force={force})")
+    if not force and (cover or preview):
+        skipped += 1
+        continue
 
-            res = itunes_search_track(s.artist, s.title)
-            if not res:
-                print(f"ENRICH: not found {s.artist} – {s.title}")
-                continue
+    print(f"ENRICH: trying {artist} – {title} (force={force})", flush=True)
 
-            if not cover:
-                s.cover = res.get("cover")
-            if not preview:
-                s.preview_url = res.get("preview_url")
+    res = itunes_search_track(artist, title)
+    if not res:
+        print(f"ENRICH: not found {artist} – {title}", flush=True)
+        continue
 
-            updated += 1
-            print(f"ENRICH: updated {s.artist} – {s.title}")
+    if not cover:
+        s["cover"] = res.get("cover")
+    if not preview:
+        s["preview_url"] = res.get("preview_url")
 
-        print(
-            f"ENRICH DONE: week_id={week_id}, "
-            f"processed={processed}, updated={updated}, skipped={skipped}"
-        )
+    updated += 1
+    print(f"ENRICH: updated {artist} – {title}", flush=True)
 
         return {
             "ok": True,
