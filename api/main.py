@@ -253,11 +253,13 @@ def normalize_songs(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 @app.on_event("startup")
 def startup_event():
     items = load_songs_from_file()
-    items = normalize_songs(items)
-    SONGS_BY_WEEK[CURRENT_WEEK_ID] = items
+
+    # ВАЖНО: временно отключаем normalize_songs, потому что он обнуляет список
+    SONGS_BY_WEEK[CURRENT_WEEK_ID] = items if isinstance(items, list) else []
 
     print(f"[BOOT] CURRENT_WEEK_ID={CURRENT_WEEK_ID}", flush=True)
     print(f"[BOOT] SONGS_PATH={SONGS_PATH} exists={SONGS_PATH.exists()}", flush=True)
+    print(f"[BOOT] RAW_ITEMS_TYPE={type(items)}", flush=True)
     print(f"[BOOT] SONGS_COUNT={len(SONGS_BY_WEEK.get(CURRENT_WEEK_ID, []))}", flush=True)
 
 
@@ -311,6 +313,11 @@ def weeks_results(week_id: int):
     votes = VOTES.get(week_id, {})
     return [{"song_id": sid, "votes": votes.get(sid, 0)} for sid in sorted(votes.keys())]
 
+@app.get("/admin/weeks/current/songs/export")
+def admin_export_current_week(x_admin_token: Optional[str] = Header(default=None)):
+    require_admin(x_admin_token)
+    items = SONGS_BY_WEEK.get(CURRENT_WEEK_ID, [])
+    return items
 
 @app.post("/weeks/{week_id}/vote", response_model=VoteOut)
 def weeks_vote(
