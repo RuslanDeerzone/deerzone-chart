@@ -1,321 +1,355 @@
-[
-  {
-    "artist": "EXO",
-    "title": "I'm Home",
-    "weeks_in_chart": 4,
-    "is_new": false,
-    "source": "carryover",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "MINHO (SHINee)",
-    "title": "TEMPO",
-    "weeks_in_chart": 4,
-    "is_new": false,
-    "source": "carryover",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "Stray Kids",
-    "title": "Do It",
-    "weeks_in_chart": 8,
-    "is_new": false,
-    "source": "carryover",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "ITZY",
-    "title": "TUNNEL VISION",
-    "weeks_in_chart": 9,
-    "is_new": false,
-    "source": "carryover",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "Stray Kids",
-    "title": "DIVINE",
-    "weeks_in_chart": 6,
-    "is_new": false,
-    "source": "carryover",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "BABYMONSTER",
-    "title": "PSYCHO",
-    "weeks_in_chart": 5,
-    "is_new": false,
-    "source": "carryover",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "Bang Chan (Stray Kids)",
-    "title": "Roman Empire",
-    "weeks_in_chart": 9,
-    "is_new": false,
-    "source": "carryover",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "ALLDAY PROJECT",
-    "title": "LOOK AT ME",
-    "weeks_in_chart": 4,
-    "is_new": false,
-    "source": "carryover",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "ILLIT",
-    "title": "NOT CUTE ANYMORE",
-    "weeks_in_chart": 6,
-    "is_new": false,
-    "source": "carryover",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "Seonghwa (ATEEZ)",
-    "title": "Skin",
-    "weeks_in_chart": 2,
-    "is_new": true,
-    "source": "carryover",
-    "cover": null,
-    "preview_url": null
-  },
-
-  {
-    "artist": "Re:Hearts",
-    "title": "Persona",
-    "weeks_in_chart": 1,
-    "is_new": true,
-    "source": "new",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "Apink",
-    "title": "Love Me More",
-    "weeks_in_chart": 1,
-    "is_new": true,
-    "source": "new",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "JOOHONEY (MONSTA X)",
-    "title": "STING",
-    "weeks_in_chart": 1,
-    "is_new": true,
-    "source": "new",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "idntt",
-    "title": "Pretty Boy Swag",
-    "weeks_in_chart": 1,
-    "is_new": true,
-    "source": "new",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "H1-KEY",
-    "title": "The World Isn’t Like a Movie",
-    "weeks_in_chart": 1,
-    "is_new": true,
-    "source": "new",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "1MILLION",
-    "title": "AT US",
-    "weeks_in_chart": 1,
-    "is_new": true,
-    "source": "new",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "CNBLUE",
-    "title": "Killer Joy",
-    "weeks_in_chart": 1,
-    "is_new": true,
-    "source": "new",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "CHUU",
-    "title": "XO, My Cyberlove",
-    "weeks_in_chart": 1,
-    "is_new": true,
-    "source": "new",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "BADA",
-    "title": "Our Loud Goodbye",
-    "weeks_in_chart": 1,
-    "is_new": true,
-    "source": "new",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "Shin Soohyun (UKISS)",
-    "title": "Gray",
-    "weeks_in_chart": 1,
-    "is_new": true,
-    "source": "new",
-    "cover": null,
-    "preview_url": null
-  },
-
-  {
-    "artist": "DynamicDuo feat. Sunghoon (ENHYPEN)",
-    "title": "Watch It, Feel It",
-    "weeks_in_chart": 1,
-    "is_new": true,
-    "source": "new",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "JIMIN",
-    "title": "0108",
-    "weeks_in_chart": 1,
-    "is_new": true,
-    "source": "new",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "WAKER",
-    "title": "LiKE THAT",
-    "weeks_in_chart": 1,
-    "is_new": true,
-    "source": "new",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "LATENCY",
-    "title": "it was love",
-    "weeks_in_chart": 1,
-    "is_new": true,
-    "source": "new",
-    "cover": null,
-    "preview_url": null
-  },
-
-  {
-    "artist": "ZICO & Crush",
-    "title": "Yin and Yang (SMTM12)",
-    "weeks_in_chart": 1,
-    "is_new": true,
-    "source": "new",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "GRAY & Loco",
-    "title": "PAPER (SMTM12)",
-    "weeks_in_chart": 1,
-    "is_new": true,
-    "source": "new",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "J-Tong & Hukky Shibaseki",
-    "title": "Cockroaches (SMTM12)",
-    "weeks_in_chart": 1,
-    "is_new": true,
-    "source": "new",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "Lil Moshpit & Jay Park",
-    "title": "GOAT (SMTM12)",
-    "weeks_in_chart": 1,
-    "is_new": true,
-    "source": "new",
-    "cover": null,
-    "preview_url": null
-  },
-
-  {
-    "artist": "DIA (AWU)",
-    "title": "Dance!",
-    "weeks_in_chart": 1,
-    "is_new": true,
-    "source": "new",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "ZEROBASEONE",
-    "title": "Running to Future",
-    "weeks_in_chart": 1,
-    "is_new": true,
-    "source": "new",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "COMMA",
-    "title": "Toxic Sugar",
-    "weeks_in_chart": 1,
-    "is_new": true,
-    "source": "new",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "YOUNG POSSE × BENZO",
-    "title": "LOSE YOUR SHXT",
-    "weeks_in_chart": 1,
-    "is_new": true,
-    "source": "new",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "Park Gunwook (ZEROBASEONE)",
-    "title": "Day After Day",
-    "weeks_in_chart": 1,
-    "is_new": true,
-    "source": "new",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "HADES",
-    "title": "Planet B",
-    "weeks_in_chart": 1,
-    "is_new": true,
-    "source": "new",
-    "cover": null,
-    "preview_url": null
-  },
-  {
-    "artist": "HA SUNG WOONG",
-    "title": "Tell The World",
-    "weeks_in_chart": 1,
-    "is_new": true,
-    "source": "new",
-    "cover": null,
-    "preview_url": null
-  }
-]
+﻿{
+    "value":  [
+                  {
+                      "id":  16,
+                      "artist":  "1MILLION",
+                      "title":  "AT US",
+                      "is_new":  true,
+                      "weeks_in_chart":  1,
+                      "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/2c/6b/eb/2c6bebf3-b93f-61a8-e699-ad2bc5b8435a/888272174069.jpg/600x600bb.jpg",
+                      "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/ad/92/44/ad9244f6-4a15-3e6e-37e4-4ba467245011/mzaf_7349567318133095329.plus.aac.p.m4a",
+                      "source":  "new"
+                  },
+                  {
+                      "id":  8,
+                      "artist":  "ALLDAY PROJECT",
+                      "title":  "LOOK AT ME",
+                      "is_new":  false,
+                      "weeks_in_chart":  4,
+                      "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/6f/4b/3e/6f4b3e21-d943-de6c-9ced-3380191e5880/8800344687224.jpg/600x600bb.jpg",
+                      "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/66/73/69/667369a6-c4df-713b-f554-8e7709f0c76a/mzaf_5653226568251443672.plus.aac.p.m4a",
+                      "source":  "carryover"
+                  },
+                  {
+                      "id":  12,
+                      "artist":  "Apink",
+                      "title":  "Love Me More",
+                      "is_new":  true,
+                      "weeks_in_chart":  1,
+                      "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/f7/ac/d5/f7acd52e-d02b-7f97-03df-f3e6119fc0d3/888272173352_Cover.jpg/600x600bb.jpg",
+                      "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/16/d0/08/16d008d7-bbaf-f65f-5086-8d42f5bae063/mzaf_10664666588944434366.plus.aac.p.m4a",
+                      "source":  "new"
+                  },
+                  {
+                      "id":  6,
+                      "artist":  "BABYMONSTER",
+                      "title":  "PSYCHO",
+                      "is_new":  false,
+                      "weeks_in_chart":  5,
+                      "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/dc/2c/91/dc2c911c-4860-2834-2fc8-3d1d55f077d8/8809519880989_cover.jpg/600x600bb.jpg",
+                      "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/f7/46/b0/f746b0bd-aa60-11aa-3db7-fce145c8283c/mzaf_2493928520448820176.plus.aac.p.m4a",
+                      "source":  "carryover"
+                  },
+                  {
+                      "id":  19,
+                      "artist":  "BADA",
+                      "title":  "Our Loud Goodbye",
+                      "is_new":  true,
+                      "weeks_in_chart":  1,
+                      "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/ee/2a/c3/ee2ac339-112b-ff91-d104-d17d5be0b4ec/888618460948.jpg/600x600bb.jpg",
+                      "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/ab/c4/71/abc471dd-cded-4ba2-92f5-c736a0d622d0/mzaf_6589915411265589561.plus.aac.p.m4a",
+                      "source":  "new"
+                  },
+                  {
+                      "id":  7,
+                      "artist":  "Bang Chan (Stray Kids)",
+                      "title":  "Roman Empire",
+                      "is_new":  false,
+                      "weeks_in_chart":  9,
+                      "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/51/d8/58/51d858b1-94df-2047-d2b4-0378ca0cd9db/192641939440_Cover.jpg/600x600bb.jpg",
+                      "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview116/v4/31/62/7f/31627f61-6855-9992-04e0-3d351cf73776/mzaf_16991262806565158610.plus.aac.p.m4a",
+                      "source":  "carryover"
+                  },
+                  {
+                      "id":  18,
+                      "artist":  "CHUU",
+                      "title":  "XO, My Cyberlove",
+                      "is_new":  true,
+                      "weeks_in_chart":  1,
+                      "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/bd/1b/16/bd1b169c-0099-c216-0aab-e2c32c087fc0/888272173482.jpg/600x600bb.jpg",
+                      "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/49/e8/88/49e88823-bec4-1861-68cb-4659abbd56e1/mzaf_11310102716324271210.plus.aac.p.m4a",
+                      "source":  "new"
+                  },
+                  {
+                      "id":  17,
+                      "artist":  "CNBLUE",
+                      "title":  "Killer Joy",
+                      "is_new":  true,
+                      "weeks_in_chart":  1,
+                      "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/ed/c8/25/edc8256e-c6b4-d9ca-4f34-4f8154f5522b/cover_KM0024027_1.jpg/600x600bb.jpg",
+                      "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/ed/30/f6/ed30f63d-2371-3fdf-c775-c4b4602d6e1a/mzaf_6853653639110569664.plus.aac.p.m4a",
+                      "source":  "new"
+                  },
+                  {
+                      "id":  31,
+                      "artist":  "COMMA",
+                      "title":  "Toxic Sugar",
+                      "is_new":  true,
+                      "weeks_in_chart":  1,
+                      "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/ae/8b/39/ae8b3982-aeca-4b2c-cffb-57580863eef5/888618460764.jpg/600x600bb.jpg",
+                      "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/94/eb/f7/94ebf76f-eb37-10cf-e1b6-f2fad920baa9/mzaf_1304160518709359456.plus.aac.p.m4a",
+                      "source":  "new"
+                  },
+                  {
+                      "id":  29,
+                      "artist":  "DIA (AWU)",
+                      "title":  "Dance!",
+                      "is_new":  true,
+                      "weeks_in_chart":  1,
+                      "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/1e/04/0e/1e040e24-fbe8-7b68-abfd-afb9d5c5cada/757572942466.jpg/600x600bb.jpg",
+                      "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/df/65/64/df656430-161e-083e-d07c-2f3d021bb608/mzaf_10976554713371552461.plus.aac.p.m4a",
+                      "source":  "new"
+                  },
+                  {
+                      "id":  21,
+                      "artist":  "DynamicDuo feat. Sunghoon (ENHYPEN)",
+                      "title":  "Watch It, Feel It",
+                      "is_new":  true,
+                      "weeks_in_chart":  1,
+                      "cover":  null,
+                      "preview_url":  null,
+                      "source":  "new"
+                  },
+                  {
+                      "id":  1,
+                      "artist":  "EXO",
+                      "title":  "I\u0027m Home",
+                      "is_new":  false,
+                      "weeks_in_chart":  4,
+                      "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/66/cf/70/66cf7012-98ed-b201-21ed-b1ee0e9ad26f/19UM1IM00155.rgb.jpg/600x600bb.jpg",
+                      "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview116/v4/ee/8d/69/ee8d690e-f71f-2d33-f5ac-9d78d036f07f/mzaf_3207252371777298984.plus.aac.p.m4a",
+                      "source":  "carryover"
+                  },
+                  {
+                      "id":  26,
+                      "artist":  "GRAY \u0026 Loco",
+                      "title":  "PAPER (SMTM12)",
+                      "is_new":  true,
+                      "weeks_in_chart":  1,
+                      "cover":  null,
+                      "preview_url":  null,
+                      "source":  "new"
+                  },
+                  {
+                      "id":  15,
+                      "artist":  "H1-KEY",
+                      "title":  "The World Isnât Like a Movie",
+                      "is_new":  true,
+                      "weeks_in_chart":  1,
+                      "cover":  null,
+                      "preview_url":  null,
+                      "source":  "new"
+                  },
+                  {
+                      "id":  35,
+                      "artist":  "HA SUNG WOONG",
+                      "title":  "Tell The World",
+                      "is_new":  true,
+                      "weeks_in_chart":  1,
+                      "cover":  null,
+                      "preview_url":  null,
+                      "source":  "new"
+                  },
+                  {
+                      "id":  34,
+                      "artist":  "HADES",
+                      "title":  "Planet B",
+                      "is_new":  true,
+                      "weeks_in_chart":  1,
+                      "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/0e/a2/68/0ea268db-1390-5861-d07d-5cc27cd3ac9a/191953506296.jpg/600x600bb.jpg",
+                      "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/b7/63/a5/b763a554-208f-4051-5566-3d334f32b138/mzaf_14750542120784005560.plus.aac.p.m4a",
+                      "source":  "new"
+                  },
+                  {
+                      "id":  14,
+                      "artist":  "idntt",
+                      "title":  "Pretty Boy Swag",
+                      "is_new":  true,
+                      "weeks_in_chart":  1,
+                      "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/20/b3/da/20b3da69-ff12-4106-fa96-af0a6ec71a43/8804775402166.jpg/600x600bb.jpg",
+                      "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/93/a6/54/93a654df-99ea-3c76-6d44-b2c225a3085d/mzaf_18081642303821248085.plus.aac.p.m4a",
+                      "source":  "new"
+                  },
+                  {
+                      "id":  9,
+                      "artist":  "ILLIT",
+                      "title":  "NOT CUTE ANYMORE",
+                      "is_new":  false,
+                      "weeks_in_chart":  6,
+                      "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/a5/de/95/a5de954b-4e07-975b-1621-7681fd218e15/198704763106_Cover.jpg/600x600bb.jpg",
+                      "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/b7/87/74/b7877496-087a-014d-07d1-cb8f934e6465/mzaf_6580320150417650379.plus.aac.p.m4a",
+                      "source":  "carryover"
+                  },
+                  {
+                      "id":  4,
+                      "artist":  "ITZY",
+                      "title":  "TUNNEL VISION",
+                      "is_new":  false,
+                      "weeks_in_chart":  9,
+                      "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/c2/9e/8b/c29e8be0-0898-86a0-11e7-927214dff34f/8809928954103_Cover.jpg/600x600bb.jpg",
+                      "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/b4/33/e3/b433e310-119a-c8b9-dae2-951157d802e1/mzaf_165578911713600517.plus.aac.p.m4a",
+                      "source":  "carryover"
+                  },
+                  {
+                      "id":  27,
+                      "artist":  "J-Tong \u0026 Hukky Shibaseki",
+                      "title":  "Cockroaches (SMTM12)",
+                      "is_new":  true,
+                      "weeks_in_chart":  1,
+                      "cover":  null,
+                      "preview_url":  null,
+                      "source":  "new"
+                  },
+                  {
+                      "id":  22,
+                      "artist":  "JIMIN",
+                      "title":  "0108",
+                      "is_new":  true,
+                      "weeks_in_chart":  1,
+                      "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/2a/aa/f9/2aaaf967-f2b2-e181-6653-24fe521f1c5c/888272174601_Cover.jpg/600x600bb.jpg",
+                      "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/2c/ce/36/2cce3625-8896-6457-3ea4-fda16dcba1a4/mzaf_11612135628737507656.plus.aac.p.m4a",
+                      "source":  "new"
+                  },
+                  {
+                      "id":  13,
+                      "artist":  "JOOHONEY (MONSTA X)",
+                      "title":  "STING",
+                      "is_new":  true,
+                      "weeks_in_chart":  1,
+                      "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/ed/5b/f5/ed5bf584-b2f5-d967-3f92-4dfdf826b880/199806729342.jpg/600x600bb.jpg",
+                      "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/d6/25/b9/d625b97a-487e-d40c-3e44-044b8c42ccef/mzaf_17397277668494059364.plus.aac.p.m4a",
+                      "source":  "new"
+                  },
+                  {
+                      "id":  24,
+                      "artist":  "LATENCY",
+                      "title":  "it was love",
+                      "is_new":  true,
+                      "weeks_in_chart":  1,
+                      "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/c6/29/c2/c629c20c-3f5a-709b-fb95-5bac635acc69/cover_KM0024044_1.jpg/600x600bb.jpg",
+                      "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/2d/fb/36/2dfb3699-9bb0-19dd-ccb1-8fca26837c88/mzaf_15980160984496328667.plus.aac.p.m4a",
+                      "source":  "new"
+                  },
+                  {
+                      "id":  28,
+                      "artist":  "Lil Moshpit \u0026 Jay Park",
+                      "title":  "GOAT (SMTM12)",
+                      "is_new":  true,
+                      "weeks_in_chart":  1,
+                      "cover":  null,
+                      "preview_url":  null,
+                      "source":  "new"
+                  },
+                  {
+                      "id":  2,
+                      "artist":  "MINHO (SHINee)",
+                      "title":  "TEMPO",
+                      "is_new":  false,
+                      "weeks_in_chart":  4,
+                      "cover":  null,
+                      "preview_url":  null,
+                      "source":  "carryover"
+                  },
+                  {
+                      "id":  33,
+                      "artist":  "Park Gunwook (ZEROBASEONE)",
+                      "title":  "Day After Day",
+                      "is_new":  true,
+                      "weeks_in_chart":  1,
+                      "cover":  null,
+                      "preview_url":  null,
+                      "source":  "new"
+                  },
+                  {
+                      "id":  11,
+                      "artist":  "Re:Hearts",
+                      "title":  "Persona",
+                      "is_new":  true,
+                      "weeks_in_chart":  1,
+                      "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/ce/50/b3/ce50b389-b305-4696-2cf2-a4601bf1498d/888272174304_Cover.jpg/600x600bb.jpg",
+                      "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/e4/9e/43/e49e43f0-0db0-573c-6f5d-10996d4f8c5a/mzaf_15804058068667922601.plus.aac.p.m4a",
+                      "source":  "new"
+                  },
+                  {
+                      "id":  10,
+                      "artist":  "Seonghwa (ATEEZ)",
+                      "title":  "Skin",
+                      "is_new":  true,
+                      "weeks_in_chart":  2,
+                      "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/67/41/06/6741061b-db7d-dccb-6200-0be18e0a7cf8/196873101224.jpg/600x600bb.jpg",
+                      "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/35/3b/8c/353b8c30-bbe1-14d3-9527-7939d0264f2b/mzaf_13401080495321099841.plus.aac.p.m4a",
+                      "source":  "carryover"
+                  },
+                  {
+                      "id":  20,
+                      "artist":  "Shin Soohyun (UKISS)",
+                      "title":  "Gray",
+                      "is_new":  true,
+                      "weeks_in_chart":  1,
+                      "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music3/v4/c0/f5/71/c0f571f8-25d6-548d-638c-136dc53e12c2/8809419985708_Jacket.jpg/600x600bb.jpg",
+                      "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/3a/19/ca/3a19caca-36cf-20a5-87f8-444785fe1950/mzaf_15575317404802359648.plus.aac.p.m4a",
+                      "source":  "new"
+                  },
+                  {
+                      "id":  5,
+                      "artist":  "Stray Kids",
+                      "title":  "DIVINE",
+                      "is_new":  false,
+                      "weeks_in_chart":  6,
+                      "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/72/33/69/7233691c-aefe-252d-678b-faa9b3455200/8809928958965_Cover.jpg/600x600bb.jpg",
+                      "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/0f/c5/e5/0fc5e542-6ffb-c9a9-22c5-28cb27526a8d/mzaf_9501414723496878264.plus.aac.p.m4a",
+                      "source":  "carryover"
+                  },
+                  {
+                      "id":  3,
+                      "artist":  "Stray Kids",
+                      "title":  "Do It",
+                      "is_new":  false,
+                      "weeks_in_chart":  8,
+                      "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/72/33/69/7233691c-aefe-252d-678b-faa9b3455200/8809928958965_Cover.jpg/600x600bb.jpg",
+                      "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/3f/58/d4/3f58d47b-4d4c-2b22-5ba5-c5ca66c5f26b/mzaf_7069320622919057855.plus.aac.p.m4a",
+                      "source":  "carryover"
+                  },
+                  {
+                      "id":  23,
+                      "artist":  "WAKER",
+                      "title":  "LiKE THAT",
+                      "is_new":  true,
+                      "weeks_in_chart":  1,
+                      "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/cf/0d/96/cf0d9623-fa60-e94e-ddd7-6bfd035d2a8a/5026854351049.jpg/600x600bb.jpg",
+                      "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/d0/09/23/d0092316-98c2-dc2a-56cc-5fa1df9b2032/mzaf_3774205571822870693.plus.aac.p.m4a",
+                      "source":  "new"
+                  },
+                  {
+                      "id":  32,
+                      "artist":  "YOUNG POSSE Ã BENZO",
+                      "title":  "LOSE YOUR SHXT",
+                      "is_new":  true,
+                      "weeks_in_chart":  1,
+                      "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/a8/45/90/a8459078-ce6f-85c3-e995-ea1af3cc1707/cover_KM0024056_1.jpg/600x600bb.jpg",
+                      "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/e4/94/01/e494013e-40c9-b27e-cec7-e72bbc3b3b87/mzaf_17740574513972155401.plus.aac.p.m4a",
+                      "source":  "new"
+                  },
+                  {
+                      "id":  30,
+                      "artist":  "ZEROBASEONE",
+                      "title":  "Running to Future",
+                      "is_new":  true,
+                      "weeks_in_chart":  1,
+                      "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/03/2f/c8/032fc8f5-cb17-b8c8-2908-6a0c15d41b79/198704910524_Cover.jpg/600x600bb.jpg",
+                      "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/6e/cc/42/6ecc4265-f8cd-ed73-74cc-9b8e4c644f3c/mzaf_5072318811935568474.plus.aac.p.m4a",
+                      "source":  "new"
+                  },
+                  {
+                      "id":  25,
+                      "artist":  "ZICO \u0026 Crush",
+                      "title":  "Yin and Yang (SMTM12)",
+                      "is_new":  true,
+                      "weeks_in_chart":  1,
+                      "cover":  null,
+                      "preview_url":  null,
+                      "source":  "new"
+                  }
+              ],
+    "Count":  35
+}
