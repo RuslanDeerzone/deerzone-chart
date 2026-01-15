@@ -448,6 +448,7 @@ def admin_enrich_current_week(
         "updated": updated,
         "skipped": skipped,
         "errors": errors,
+        }
 
 
 # ===== DEBUG (safe) =====
