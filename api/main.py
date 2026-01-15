@@ -97,57 +97,21 @@ def ensure_week_exists(week_id: int) -> None:
         raise HTTPException(status_code=404, detail="WEEK_NOT_FOUND")
 
 
-def load_songs_from_file() -> list[dict]:
-    base_dir = os.path.dirname(__file__)
-    path = os.path.join(base_dir, "songs.json")
-
-    if not os.path.exists(path):
-        print(f"[BOOT] songs.json NOT FOUND: {path}", flush=True)
+def load_songs_from_file() -> List[Dict[str, Any]]:
+    """Reads api/songs.json. Expected format: JSON array (list of songs dicts)."""
+    if not SONGS_PATH.exists():
+        print(f"[BOOT] songs.json NOT FOUND: {SONGS_PATH}", flush=True)
         return []
 
     try:
-        size = os.path.getsize(path)
-        with open(path, "r", encoding="utf-8") as f:
-            raw = f.read()
-
-        print(f"[BOOT] songs.json path={path} size={size} bytes", flush=True)
-        print(f"[BOOT] songs.json head(120)={raw[:120].replace(chr(10),' ')}", flush=True)
-
-        data = json.loads(raw)
-
-        # 1) Уже список песен
-        if isinstance(data, list):
-            print(f"[BOOT] songs.json is list: {len(data)} items", flush=True)
-            return data
-
-        # 2) Если это dict — пытаемся вытащить список из разных ключей
-        if isinstance(data, dict):
-            # 2.1 популярные ключи
-            for key in ("songs", "items", "data", "results"):
-                if isinstance(data.get(key), list):
-                    print(f"[BOOT] songs.json dict -> '{key}': {len(data[key])} items", flush=True)
-                    return data[key]
-
-            # 2.2 ключ = id недели строкой: "3": [...]
-            wk = str(CURRENT_WEEK_ID)
-            if isinstance(data.get(wk), list):
-                print(f"[BOOT] songs.json dict -> week key '{wk}': {len(data[wk])} items", flush=True)
-                return data[wk]
-
-            # 2.3 вложенно: {"weeks": {"3": [...]}}
-            weeks = data.get("weeks")
-            if isinstance(weeks, dict) and isinstance(weeks.get(wk), list):
-                print(f"[BOOT] songs.json dict -> weeks['{wk}']: {len(weeks[wk])} items", flush=True)
-                return weeks[wk]
-
-            print(f"[BOOT] songs.json dict keys={list(data.keys())} BUT no list found", flush=True)
+        raw = json.loads(SONGS_PATH.read_text(encoding="utf-8"))
+        if not isinstance(raw, list):
+            print(f"[BOOT] songs.json is not a list, got: {type(raw)}", flush=True)
             return []
-
-        print(f"[BOOT] songs.json unexpected type: {type(data)}", flush=True)
-        return []
-
+        print(f"[BOOT] songs.json loaded: {len(raw)} items", flush=True)
+        return raw
     except Exception as e:
-        print(f"[BOOT] songs.json FAILED to load: {repr(e)}", flush=True)
+        print(f"[BOOT] songs.json FAILED to load: {e}", flush=True)
         return []
 
 
@@ -161,46 +125,6 @@ def require_admin(x_admin_token: Optional[str]) -> None:
         raise HTTPException(status_code=500, detail="ADMIN_TOKEN_NOT_SET_ON_SERVER")
     if not x_admin_token or x_admin_token != ADMIN_TOKEN:
         raise HTTPException(status_code=401, detail="ADMIN_UNAUTHORIZED")
-
-
-@app.get("/admin/debug/songs-file")
-def admin_debug_songs_file(x_admin_token: Optional[str] = Header(default=None)):
-    require_admin(x_admin_token)
-
-    base_dir = os.path.dirname(__file__)
-    path = os.path.join(base_dir, "songs.json")
-
-    if not os.path.exists(path):
-        return {"exists": False, "path": path}
-
-    size = os.path.getsize(path)
-    with open(path, "r", encoding="utf-8") as f:
-        raw = f.read()
-
-    head = raw[:800]
-
-    try:
-        data = json.loads(raw)
-        kind = type(data).__name__
-        if isinstance(data, dict):
-            if isinstance(data.get("songs"), list):
-                count = len(data["songs"])
-            elif isinstance(data.get("items"), list):
-                count = len(data["items"])
-            else:
-                count = 0
-        elif isinstance(data, list):
-            count = len(data)
-        else:
-            count = 0
-        parsed_ok = True
-    except Exception as e:
-        parsed_ok = False
-        kind = None
-        count = 0
-        return {"exists": True, "path": path, "size": size, "parsed_ok": False, "error": repr(e), "head": head}
-
-    return {"exists": True, "path": path, "size": size, "parsed_ok": True, "json_type": kind, "count": count, "head": head}
 
 
 def user_id_from_telegram_init_data(init_data: Optional[str]) -> str:
@@ -329,13 +253,11 @@ def normalize_songs(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 @app.on_event("startup")
 def startup_event():
     items = load_songs_from_file()
-
-    # ВАЖНО: временно отключаем normalize_songs, потому что он обнуляет список
-    SONGS_BY_WEEK[CURRENT_WEEK_ID] = items if isinstance(items, list) else []
+    items = normalize_songs(items)
+    SONGS_BY_WEEK[CURRENT_WEEK_ID] = items
 
     print(f"[BOOT] CURRENT_WEEK_ID={CURRENT_WEEK_ID}", flush=True)
     print(f"[BOOT] SONGS_PATH={SONGS_PATH} exists={SONGS_PATH.exists()}", flush=True)
-    print(f"[BOOT] RAW_ITEMS_TYPE={type(items)}", flush=True)
     print(f"[BOOT] SONGS_COUNT={len(SONGS_BY_WEEK.get(CURRENT_WEEK_ID, []))}", flush=True)
 
 
@@ -389,11 +311,6 @@ def weeks_results(week_id: int):
     votes = VOTES.get(week_id, {})
     return [{"song_id": sid, "votes": votes.get(sid, 0)} for sid in sorted(votes.keys())]
 
-@app.get("/admin/weeks/current/songs/export")
-def admin_export_current_week(x_admin_token: Optional[str] = Header(default=None)):
-    require_admin(x_admin_token)
-    items = SONGS_BY_WEEK.get(CURRENT_WEEK_ID, [])
-    return items
 
 @app.post("/weeks/{week_id}/vote", response_model=VoteOut)
 def weeks_vote(
