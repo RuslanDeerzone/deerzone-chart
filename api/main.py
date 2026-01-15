@@ -107,33 +107,44 @@ def load_songs_from_file() -> list[dict]:
 
     try:
         size = os.path.getsize(path)
-        print(f"[BOOT] songs.json path={path} size={size} bytes", flush=True)
-
         with open(path, "r", encoding="utf-8") as f:
             raw = f.read()
 
-        head = raw[:300].replace("\n", "\\n")
-        print(f"[BOOT] songs.json head(300)={head}", flush=True)
+        print(f"[BOOT] songs.json path={path} size={size} bytes", flush=True)
+        print(f"[BOOT] songs.json head(120)={raw[:120].replace(chr(10),' ')}", flush=True)
 
         data = json.loads(raw)
 
-        # Иногда файл случайно становится объектом, а не списком:
-        # { "songs": [ ... ] } или { "items": [ ... ] }
-        if isinstance(data, dict):
-            if isinstance(data.get("songs"), list):
-                data = data["songs"]
-            elif isinstance(data.get("items"), list):
-                data = data["items"]
-            else:
-                print(f"[BOOT] songs.json is dict without songs/items keys: keys={list(data.keys())}", flush=True)
-                return []
+        # 1) Уже список песен
+        if isinstance(data, list):
+            print(f"[BOOT] songs.json is list: {len(data)} items", flush=True)
+            return data
 
-        if not isinstance(data, list):
-            print(f"[BOOT] songs.json is not a list, got: {type(data)}", flush=True)
+        # 2) Если это dict — пытаемся вытащить список из разных ключей
+        if isinstance(data, dict):
+            # 2.1 популярные ключи
+            for key in ("songs", "items", "data", "results"):
+                if isinstance(data.get(key), list):
+                    print(f"[BOOT] songs.json dict -> '{key}': {len(data[key])} items", flush=True)
+                    return data[key]
+
+            # 2.2 ключ = id недели строкой: "3": [...]
+            wk = str(CURRENT_WEEK_ID)
+            if isinstance(data.get(wk), list):
+                print(f"[BOOT] songs.json dict -> week key '{wk}': {len(data[wk])} items", flush=True)
+                return data[wk]
+
+            # 2.3 вложенно: {"weeks": {"3": [...]}}
+            weeks = data.get("weeks")
+            if isinstance(weeks, dict) and isinstance(weeks.get(wk), list):
+                print(f"[BOOT] songs.json dict -> weeks['{wk}']: {len(weeks[wk])} items", flush=True)
+                return weeks[wk]
+
+            print(f"[BOOT] songs.json dict keys={list(data.keys())} BUT no list found", flush=True)
             return []
 
-        print(f"[BOOT] songs.json loaded OK: {len(data)} items", flush=True)
-        return data
+        print(f"[BOOT] songs.json unexpected type: {type(data)}", flush=True)
+        return []
 
     except Exception as e:
         print(f"[BOOT] songs.json FAILED to load: {repr(e)}", flush=True)
