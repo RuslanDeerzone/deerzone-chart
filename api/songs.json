@@ -1,4 +1,4 @@
-[
+﻿[
     {
         "id":  16,
         "artist":  "1MILLION",
@@ -51,13 +51,13 @@
     },
     {
         "id":  7,
-        "artist":  "Bang Chan (Stray Kids)",
-        "title":  "Roman Empire",
+        "artist":  "ALPHA DRIVE ONE",
+        "title":  "FREAK ALARM",
         "is_new":  false,
-        "weeks_in_chart":  9,
-        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/51/d8/58/51d858b1-94df-2047-d2b4-0378ca0cd9db/192641939440_Cover.jpg/600x600bb.jpg",
-        "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview116/v4/31/62/7f/31627f61-6855-9992-04e0-3d351cf73776/mzaf_16991262806565158610.plus.aac.p.m4a",
-        "source":  "carryover"
+        "weeks_in_chart":  1,
+        "cover":  null,
+        "preview_url":  null,
+        "source":  "new"
     },
     {
         "id":  18,
@@ -91,18 +91,18 @@
     },
     {
         "id":  29,
-        "artist":  "DIA (AWU)",
-        "title":  "Dance!",
+        "artist":  "DxS",
+        "title":  "Blue",
         "is_new":  true,
         "weeks_in_chart":  1,
-        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/1e/04/0e/1e040e24-fbe8-7b68-abfd-afb9d5c5cada/757572942466.jpg/600x600bb.jpg",
-        "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/df/65/64/df656430-161e-083e-d07c-2f3d021bb608/mzaf_10976554713371552461.plus.aac.p.m4a",
+        "cover":  null,
+        "preview_url":  null,
         "source":  "new"
     },
     {
         "id":  21,
-        "artist":  "DynamicDuo feat. Sunghoon (ENHYPEN)",
-        "title":  "Watch It, Feel It",
+        "artist":  "TARZZAN (ALLDAY PROJECT)",
+        "title":  "MEDUSA",
         "is_new":  true,
         "weeks_in_chart":  1,
         "cover":  null,
@@ -112,27 +112,29 @@
     {
         "id":  1,
         "artist":  "EXO",
-        "title":  "I\u0027m Home",
+        "title":  "I'm Home",
         "is_new":  false,
         "weeks_in_chart":  4,
-        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/66/cf/70/66cf7012-98ed-b201-21ed-b1ee0e9ad26f/19UM1IM00155.rgb.jpg/600x600bb.jpg",
-        "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview116/v4/ee/8d/69/ee8d690e-f71f-2d33-f5ac-9d78d036f07f/mzaf_3207252371777298984.plus.aac.p.m4a",
+        "cover":  "https://static.wikia.nocookie.net/kpop/images/f/f0/EXO_Reverxe_pre-save_album_cover.png/revision/latest/scale-to-width-down/1200?cb=20251215113833",
+        "preview_url":  null,
+        "youtube_url": "https://www.youtube.com/watch?v=7hTbNeHqGD8",
         "source":  "carryover"
     },
     {
         "id":  26,
-        "artist":  "GRAY \u0026 Loco",
-        "title":  "PAPER (SMTM12)",
+        "artist":  "KiiiKiii",
+        "title":  "Delulu",
         "is_new":  true,
         "weeks_in_chart":  1,
-        "cover":  null,
+        "cover":  "https://static.wikia.nocookie.net/kpop/images/b/be/KiiiKiii_Delulu_Pack_digital_album_cover.png/revision/latest/scale-to-width-down/1000?cb=20260112124118",
         "preview_url":  null,
+        "youtube_url": "https://www.youtube.com/watch?v=BTlj6Sls7KE",
         "source":  "new"
     },
     {
         "id":  15,
-        "artist":  "H1-KEY",
-        "title":  "The World Isnât Like a Movie",
+        "artist":  "Inseong",
+        "title":  "Mute is Off",
         "is_new":  true,
         "weeks_in_chart":  1,
         "cover":  null,
@@ -141,8 +143,8 @@
     },
     {
         "id":  35,
-        "artist":  "HA SUNG WOONG",
-        "title":  "Tell The World",
+        "artist":  "ONEWE",
+        "title":  "Ferris wheel",
         "is_new":  true,
         "weeks_in_chart":  1,
         "cover":  null,
@@ -151,12 +153,12 @@
     },
     {
         "id":  34,
-        "artist":  "HADES",
-        "title":  "Planet B",
+        "artist":  "2Z",
+        "title":  "Dizzy",
         "is_new":  true,
         "weeks_in_chart":  1,
-        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/0e/a2/68/0ea268db-1390-5861-d07d-5cc27cd3ac9a/191953506296.jpg/600x600bb.jpg",
-        "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/b7/63/a5/b763a554-208f-4051-5566-3d334f32b138/mzaf_14750542120784005560.plus.aac.p.m4a",
+        "cover":  null,
+        "preview_url":  null,
         "source":  "new"
     },
     {
@@ -191,8 +193,8 @@
     },
     {
         "id":  27,
-        "artist":  "J-Tong \u0026 Hukky Shibaseki",
-        "title":  "Cockroaches (SMTM12)",
+        "artist":  "ChRocktikal",
+        "title":  "PEACE",
         "is_new":  true,
         "weeks_in_chart":  1,
         "cover":  null,
@@ -231,8 +233,8 @@
     },
     {
         "id":  28,
-        "artist":  "Lil Moshpit \u0026 Jay Park",
-        "title":  "GOAT (SMTM12)",
+        "artist":  "ILLIT",
+        "title":  "Sunday Morning",
         "is_new":  true,
         "weeks_in_chart":  1,
         "cover":  null,
@@ -241,7 +243,7 @@
     },
     {
         "id":  2,
-        "artist":  "MINHO (SHINee)",
+        "artist":  "MINHO",
         "title":  "TEMPO",
         "is_new":  false,
         "weeks_in_chart":  4,
@@ -251,8 +253,8 @@
     },
     {
         "id":  33,
-        "artist":  "Park Gunwook (ZEROBASEONE)",
-        "title":  "Day After Day",
+        "artist":  "LNGSHOT",
+        "title":  "Moonwalkin",
         "is_new":  true,
         "weeks_in_chart":  1,
         "cover":  null,
@@ -321,7 +323,7 @@
     },
     {
         "id":  32,
-        "artist":  "YOUNG POSSE Ã BENZO",
+        "artist":  "YOUNG POSSE x BENZO",
         "title":  "LOSE YOUR SHXT",
         "is_new":  true,
         "weeks_in_chart":  1,
@@ -341,8 +343,58 @@
     },
     {
         "id":  25,
-        "artist":  "ZICO \u0026 Crush",
+        "artist":  "ZICO & Crush",
         "title":  "Yin and Yang (SMTM12)",
+        "is_new":  true,
+        "weeks_in_chart":  1,
+        "cover":  null,
+        "preview_url":  null,
+        "source":  "new"
+    },
+    {
+        "id":  36,
+        "artist":  "n.SSign",
+        "title":  "Funky like me",
+        "is_new":  true,
+        "weeks_in_chart":  1,
+        "cover":  null,
+        "preview_url":  null,
+        "source":  "new"
+    },
+    {
+        "id":  37,
+        "artist":  "NCT WISH",
+        "title":  "Hello Mellow",
+        "is_new":  true,
+        "weeks_in_chart":  1,
+        "cover":  null,
+        "preview_url":  null,
+        "source":  "new"
+    },
+    {
+        "id":  38,
+        "artist":  "LIGHTSUM",
+        "title":  "Beautiful and Painful",
+        "is_new":  true,
+        "weeks_in_chart":  1,
+        "cover":  null,
+        "preview_url":  null,
+        "source":  "new"
+    },
+    {
+        "id":  39,
+        "artist":  "MISAMO",
+        "title":  "Confetti",
+        "is_new":  true,
+        "weeks_in_chart":  1,
+        "cover":  null,
+        "preview_url":  null,
+        "source":  "new"
+    },
+    {
+        "id":  40,
+        "artist":  "ENHYPEN",
+        "title":  "Knife",
         "is_new":  true,
         "weeks_in_chart":  1,
         "cover":  null,
@@ -350,3 +402,4 @@
         "source":  "new"
     }
 ]
+
