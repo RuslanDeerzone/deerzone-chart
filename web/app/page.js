@@ -35,43 +35,34 @@ function isYoutubeUrl(url) {
 export default function Home() {
   const [week, setWeek] = useState(null);
 
-  // вкладка: all | new | current
   const [tab, setTab] = useState("all");
-
   const [search, setSearch] = useState("");
   const [songs, setSongs] = useState([]);
   const [selected, setSelected] = useState(new Set());
   const [error, setError] = useState("");
 
   const [isVoting, setIsVoting] = useState(false);
-  const [voteMsg, setVoteMsg] = useState(""); // авто-скрываемое сообщение
+  const [voteMsg, setVoteMsg] = useState("");
 
+  // ✅ ЕДИНСТВЕННЫЙ initData
   const [initData, setInitData] = useState("");
 
   useEffect(() => {
-    const v = window?.Telegram?.WebApp?.initData || "";
+    if (typeof window === "undefined") return;
+
+    const v = window.Telegram?.WebApp?.initData || "";
     setInitData(v);
     console.log("Telegram initData:", v ? "[present]" : "[empty]");
-  }, []);
 
-console.log("Telegram initData:", initData);
-
-  useEffect(() => {
-    setInitData(getInitDataSafe());
+    try {
+      window.Telegram?.WebApp?.ready?.();
+      window.Telegram?.WebApp?.expand?.();
+    } catch {}
   }, []);
-  try {
-    window?.Telegram?.WebApp?.ready?.();
-    window?.Telegram?.WebApp?.expand?.();
-  } catch {}
 
   // audio preview
   const audioRef = useRef(null);
   const [playingId, setPlayingId] = useState(null);
-
-  const initData =
-    typeof window !== "undefined"
-      ? window.Telegram?.WebApp?.initData || null
-      : null;
 
   const voteTimer = useRef(null);
 
@@ -80,7 +71,6 @@ console.log("Telegram initData:", initData);
     setVoteMsg(msg);
     voteTimer.current = setTimeout(() => setVoteMsg(""), 3000);
   }
-
   // 1) текущая неделя
   useEffect(() => {
     (async () => {
