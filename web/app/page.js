@@ -48,17 +48,13 @@ export default function Home() {
   const [initData, setInitData] = useState("");
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const v = window.Telegram?.WebApp?.initData || "";
-    setInitData(v);
-    console.log("Telegram initData:", v ? "[present]" : "[empty]");
-
-    try {
-      window.Telegram?.WebApp?.ready?.();
-      window.Telegram?.WebApp?.expand?.();
-    } catch {}
-  }, []);
+    const tg = window?.Telegram?.WebApp;
+    console.log("TG object:", tg ? "present" : "MISSING");
+    console.log("initData length:", tg?.initData?.length || 0);
+    console.log("platform:", tg?.platform || "n/a");
+    console.log("version:", tg?.version || "n/a");
+    try { tg?.ready?.(); tg?.expand?.(); } catch(e) {}
+}, []);
 
   // audio preview
   const audioRef = useRef(null);
