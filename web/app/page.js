@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
-const LOGO_SRC = "/logo-deerzone.png"; // web/public/logo-deerzone.png
 
 function getInitDataSafe() {
   if (typeof window === "undefined") return "";
@@ -19,16 +18,18 @@ async function safeJson(r) {
   }
 }
 
-// сортировка: артист -> название (без учета регистра)
-function sortByArtistThenTitle(a, b) {
-  const aa = String(a?.artist || "").toLowerCase();
-  const bb = String(b?.artist || "").toLowerCase();
-  const t1 = String(a?.title || "").toLowerCase();
-  const t2 = String(b?.title || "").toLowerCase();
-
-  const c1 = aa.localeCompare(bb);
-  if (c1 !== 0) return c1;
-  return t1.localeCompare(t2);
+function normStr(v) {
+  return String(v || "").trim();
+}
+function artistKey(s) {
+  return normStr(s?.artist).toLowerCase();
+}
+function titleKey(s) {
+  return normStr(s?.title).toLowerCase();
+}
+function isYoutubeUrl(url) {
+  const u = String(url || "");
+  return u.includes("youtube.com") || u.includes("youtu.be");
 }
 
 export default function Home() {
@@ -43,16 +44,23 @@ export default function Home() {
   const [error, setError] = useState("");
 
   const [isVoting, setIsVoting] = useState(false);
-  const [voteOk, setVoteOk] = useState(false);
+  const [voteMsg, setVoteMsg] = useState(""); // авто-скрываемое сообщение
 
+  const initData = useMemo(() => getInitDataSafe(), []);
 
   // audio preview
   const audioRef = useRef(null);
   const [playingId, setPlayingId] = useState(null);
 
-  const initData = useMemo(() => getInitDataSafe(), []);
+  const voteTimer = useRef(null);
 
-  // 1) грузим текущую неделю
+  function setFlash(msg) {
+    if (voteTimer.current) clearTimeout(voteTimer.current);
+    setVoteMsg(msg);
+    voteTimer.current = setTimeout(() => setVoteMsg(""), 3000);
+  }
+
+  // 1) текущая неделя
   useEffect(() => {
     (async () => {
       setError("");
@@ -75,48 +83,53 @@ export default function Home() {
         setWeek(parsed.data);
       } catch (e) {
         console.error(e);
-        setError("Не удалось загрузить список");
+        setError("Не удалось загрузить неделю");
       }
     })();
   }, [initData]);
 
-  // 2) грузим песни недели (всегда filter=all, вкладки режем на фронте)
+  // 2) песни недели (на API current нет — берём all, а current фильтруем на фронте)
   useEffect(() => {
     if (!week?.id) return;
 
     (async () => {
+      setError("");
       try {
-        setError("");
-
+        const filter = tab === "new" ? "new" : "all";
         const q = typeof search === "string" ? search : "";
-        const url = `${API_BASE}/weeks/${week.id}/songs?filter=all&search=${encodeURIComponent(q)}`;
+        const url = `${API_BASE}/weeks/${week.id}/songs?filter=${filter}&search=${encodeURIComponent(
+          q
+        )}`;
 
         const r = await fetch(url, {
           cache: "no-store",
           headers: initData ? { "X-Telegram-Init-Data": initData } : {},
         });
 
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const parsed = await safeJson(r);
+        if (!r.ok) {
+          const detail = parsed.ok ? JSON.stringify(parsed.data) : parsed.text;
+          throw new Error(detail || `HTTP ${r.status}`);
+        }
+        if (!parsed.ok) throw new Error("API вернул не-JSON");
 
-        const data = await r.json();
-        setSongs(Array.isArray(data) ? data : []);
+        setSongs(Array.isArray(parsed.data) ? parsed.data : []);
       } catch (e) {
         console.error(e);
         setSongs([]);
         setError("Не удалось загрузить список");
       }
     })();
-  }, [week?.id, search, initData]);
+  }, [week?.id, tab, search, initData]);
 
-  // аккуратно останавливаем аудио при размонтаже
+  // cleanup
   useEffect(() => {
     return () => {
       try {
-        if (audioRef.current) {
-          audioRef.current.pause();
-          audioRef.current = null;
-        }
+        if (audioRef.current) audioRef.current.pause();
       } catch {}
+      audioRef.current = null;
+      if (voteTimer.current) clearTimeout(voteTimer.current);
     };
   }, []);
 
@@ -131,69 +144,14 @@ export default function Home() {
 
   function stopAudio() {
     if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
+      try {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      } catch {}
     }
     audioRef.current = null;
     setPlayingId(null);
   }
-
-
-async function submitVote() {
-  if (!week?.id) return;
-
-  // Если хочешь запретить голосование из обычного браузера — оставляем
-  if (!initData) {
-    setError("Голосование доступно только при открытии через Telegram (нужен initData).");
-    return;
-  }
-
-  const songIds = Array.from(selected);
-  const MAX = 10;
-
-  if (songIds.length === 0) {
-    setError("Выбери хотя бы одну песню.");
-    return;
-  }
-
-  if (songIds.length > MAX) {
-    setError(`Можно выбрать максимум ${MAX} песен.`);
-    return;
-  }
-
-  try {
-    setIsVoting(true);
-    setError("");
-
-    const r = await fetch(`${API_BASE}/weeks/${week.id}/vote`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Telegram-Init-Data": initData,
-      },
-      body: JSON.stringify({ song_ids: songIds }),
-    });
-
-    const parsed = await safeJson(r);
-
-    if (!r.ok) {
-      const detail = parsed.ok ? JSON.stringify(parsed.data) : parsed.text;
-      setError(`Ошибка голосования (${r.status}): ${detail}`);
-      return;
-    }
-
-    // успех
-    setVoteOk(true);
-    setSelected(new Set());
-    alert("Голос принят ✅");
-  } catch (e) {
-    console.error(e);
-    setError("Не удалось отправить голос. Проверь интернет/сервер.");
-  } finally {
-    setIsVoting(false);
-  }
-}
-
 
   async function playPreview(song) {
     try {
@@ -204,32 +162,35 @@ async function submitVote() {
 
       stopAudio();
 
-      if (song?.preview_url) {
-        // ВАЖНО: preview_url может быть не только аудио, но и YouTube-ссылка.
-        // Если это YouTube — откроем вкладку, а не Audio().
-        const p = String(song.preview_url);
-        if (p.includes("youtube.com") || p.includes("youtu.be")) {
-          window.open(p, "_blank");
-          return;
-        }
+      const p = song?.preview_url;
 
+      // если превью = ютуб — открываем
+      if (p && isYoutubeUrl(p)) {
+        window.open(p, "_blank");
+        return;
+      }
+
+      // если есть audio preview — играем
+      if (p) {
         const a = new Audio(p);
         audioRef.current = a;
         setPlayingId(song.id);
-
-        a.play().catch(() => {
-          setPlayingId(null);
-          setError("Не удалось воспроизвести превью (браузер/Telegram блокирует звук).");
-        });
 
         a.onended = () => {
           setPlayingId(null);
           audioRef.current = null;
         };
+
+        a.play().catch(() => {
+          setPlayingId(null);
+          setError("Не удалось воспроизвести превью (Telegram/браузер блокирует звук).");
+        });
         return;
       }
 
-      setError("Для этой песни нет preview_url");
+      // fallback: поиск YouTube
+      const q = encodeURIComponent(`${song?.artist || ""} ${song?.title || ""}`.trim());
+      window.open(`https://www.youtube.com/results?search_query=${q}`, "_blank");
     } catch (e) {
       console.error(e);
       setError("Ошибка проигрывания превью");
@@ -238,26 +199,90 @@ async function submitVote() {
 
   const selectedCount = selected.size;
 
-  
-  // --- ФИЛЬТРАЦИЯ ВКЛАДОК ---
-  const displaySongs = useMemo(() => {
-    const list = Array.isArray(songs) ? [...songs] : [];
+  const visibleSongs = useMemo(() => {
+    const arr = Array.isArray(songs) ? [...songs] : [];
 
-    let filtered = list;
+    // вкладка current: то, что осталось с прошлой недели
+    if (tab === "current") {
+      const only = arr.filter((s) => {
+        const src = String(s?.source || "").toLowerCase();
+        if (src.includes("carry")) return true;
+        if (src === "new") return false;
+        return !Boolean(s?.is_new);
+      });
 
-    if (tab === "new") {
-      filtered = filtered.filter((s) => !!s?.is_new);
-    } else if (tab === "current") {
-      // "остались в чарте с прошлой недели"
-      // это надежнее всего определять по source === "carryover"
-      filtered = filtered.filter((s) => String(s?.source || "") === "carryover");
+      only.sort((a, b) => {
+        const ak = artistKey(a);
+        const bk = artistKey(b);
+        if (ak !== bk) return ak.localeCompare(bk);
+        return titleKey(a).localeCompare(titleKey(b));
+      });
+
+      return only;
     }
 
-    // All / New / Current — сортируем по артисту
-    filtered.sort(sortByArtistThenTitle);
+    // all/new — всегда сортируем по артисту
+    arr.sort((a, b) => {
+      const ak = artistKey(a);
+      const bk = artistKey(b);
+      if (ak !== bk) return ak.localeCompare(bk);
+      return titleKey(a).localeCompare(titleKey(b));
+    });
 
-    return filtered;
+    return arr;
   }, [songs, tab]);
+
+  async function submitVote() {
+    if (!week?.id) return;
+
+    // только из Telegram Mini App
+    if (!initData) {
+      setError("Голосование доступно только при открытии через Telegram (нужен initData).");
+      return;
+    }
+
+    const songIds = Array.from(selected);
+    if (songIds.length === 0) return;
+
+    try {
+      setIsVoting(true);
+      setError("");
+
+      const r = await fetch(`${API_BASE}/weeks/${week.id}/vote`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Telegram-Init-Data": initData,
+        },
+        body: JSON.stringify({ song_ids: songIds }),
+      });
+
+      const parsed = await safeJson(r);
+
+      if (!r.ok) {
+        const detail = parsed.ok ? JSON.stringify(parsed.data) : parsed.text;
+
+        if (r.status === 401) {
+          setError("Telegram auth не найден. Открой мини-апп из Telegram.");
+        } else if (r.status === 409) {
+          setError("Ты уже голосовал на этой неделе.");
+          setFlash("Ты уже голосовал ✅");
+        } else {
+          setError(`Ошибка голосования (${r.status}): ${detail}`);
+        }
+        return;
+      }
+
+      // успех
+      setSelected(new Set());
+      setFlash("Голос принят ✅");
+    } catch (e) {
+      console.error(e);
+      setError("Не удалось отправить голос. Проверь интернет/сервер.");
+    } finally {
+      setIsVoting(false);
+    }
+  }
 
   return (
     <div
@@ -265,50 +290,31 @@ async function submitVote() {
         maxWidth: 760,
         margin: "0 auto",
         padding: 18,
-        fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, Arial, sans-serif",
+        fontFamily:
+          "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, Arial, sans-serif",
       }}
     >
       <div style={{ height: 8, background: "#ff3fa4", borderRadius: 99 }} />
 
-{/* LOGO HEADER */}
-<div
-  style={{
-    marginTop: 18,
-    marginBottom: 12,
-    display: "flex",
-    justifyContent: "center",
-  }}
->
-  <img
-    src="/logo-deerzone.png"
-    alt="#deerzone chart"
-    style={{
-      width: "100%",
-      maxWidth: 520,
-      height: "auto",
-      display: "block",
-    }}
-  />
-</div>
-
-<div
-  style={{
-    textAlign: "center",
-    fontSize: 14,
-    fontWeight: 800,
-    opacity: 0.55,
-    marginBottom: 10,
-    letterSpacing: 0.5,
-  }}
->
-  weekly music chart
-</div>
+      {/* ЛОГО-ШАПКА: замени src на свой путь */}
+      <div style={{ marginTop: 16, display: "flex", justifyContent: "center" }}>
+        <img
+          src="/logo.png"
+          alt="#deerzone chart"
+          style={{
+            width: "100%",
+            maxWidth: 560,
+            height: "auto",
+            objectFit: "contain",
+          }}
+        />
+      </div>
 
       <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 12 }}>
-        <div style={{ fontSize: 22, fontWeight: 800 }}>Selected: {selectedCount}</div>
+        <div style={{ fontSize: 18, fontWeight: 900 }}>Selected: {selectedCount}</div>
 
         <button
-          disabled={selectedCount === 0|| isVoting}
+          disabled={selectedCount === 0 || isVoting}
           onClick={submitVote}
           style={{
             marginLeft: "auto",
@@ -317,14 +323,16 @@ async function submitVote() {
             border: "1px solid #eaeaea",
             background: selectedCount === 0 ? "#f5f5f5" : "#fff",
             cursor: selectedCount === 0 ? "not-allowed" : "pointer",
-            fontWeight: 800,
+            fontWeight: 900,
             opacity: isVoting ? 0.6 : 1,
           }}
         >
           {isVoting ? "Sending..." : "VOTE"}
         </button>
+      </div>
 
-      {voteOk ? (
+      {/* Сообщение успеха/повтора */}
+      {voteMsg ? (
         <div
           style={{
             marginTop: 14,
@@ -332,12 +340,28 @@ async function submitVote() {
             borderRadius: 16,
             border: "1px solid #c8f7d6",
             background: "rgba(0,200,100,0.08)",
-            fontWeight: 800,
+            fontWeight: 900,
           }}
         >
-          Голос принят ✅
+          {voteMsg}
         </div>
-       ) : null}
+      ) : null}
+
+      {/* Ошибка */}
+      {error ? (
+        <div
+          style={{
+            marginTop: 14,
+            padding: 14,
+            borderRadius: 16,
+            border: "1px solid #ffb3d8",
+            background: "rgba(255,63,164,0.08)",
+            fontWeight: 900,
+          }}
+        >
+          {error}
+        </div>
+      ) : null}
 
       <input
         value={search}
@@ -354,7 +378,6 @@ async function submitVote() {
         }}
       />
 
-      {/* ВКЛАДКИ: All / New / Current */}
       <div style={{ marginTop: 14, display: "flex", gap: 10, alignItems: "center" }}>
         <button
           onClick={() => setTab("all")}
@@ -364,7 +387,7 @@ async function submitVote() {
             border: tab === "all" ? "2px solid #ff3fa4" : "1px solid #eaeaea",
             background: tab === "all" ? "rgba(255,63,164,0.08)" : "#fff",
             cursor: "pointer",
-            fontWeight: 800,
+            fontWeight: 900,
           }}
         >
           All
@@ -378,7 +401,7 @@ async function submitVote() {
             border: tab === "new" ? "2px solid #ff3fa4" : "1px solid #eaeaea",
             background: tab === "new" ? "rgba(255,63,164,0.08)" : "#fff",
             cursor: "pointer",
-            fontWeight: 800,
+            fontWeight: 900,
           }}
         >
           New
@@ -392,33 +415,20 @@ async function submitVote() {
             border: tab === "current" ? "2px solid #ff3fa4" : "1px solid #eaeaea",
             background: tab === "current" ? "rgba(255,63,164,0.08)" : "#fff",
             cursor: "pointer",
-            fontWeight: 800,
+            fontWeight: 900,
           }}
         >
           Current
         </button>
 
-        <div style={{ marginLeft: "auto", opacity: 0.6, fontWeight: 800 }}>Artist A–Z</div>
+        <div style={{ marginLeft: "auto", opacity: 0.6, fontWeight: 900 }}>
+          Artist A–Z
+        </div>
       </div>
 
-      {error ? (
-        <div
-          style={{
-            marginTop: 14,
-            padding: 14,
-            borderRadius: 16,
-            border: "1px solid #ffb3d8",
-            background: "rgba(255,63,164,0.08)",
-            fontWeight: 800,
-          }}
-        >
-          {error}
-        </div>
-      ) : null}
-
       <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-        {Array.isArray(displaySongs) &&
-          displaySongs.map((s) => {
+        {Array.isArray(visibleSongs) &&
+          visibleSongs.map((s) => {
             const isSel = selected.has(s.id);
             const isPlaying = playingId === s.id;
 
@@ -451,7 +461,7 @@ async function submitVote() {
 
                 <div>
                   <div style={{ fontSize: 18, fontWeight: 900 }}>{s.title}</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, opacity: 0.7, marginTop: 2 }}>
+                  <div style={{ fontSize: 14, fontWeight: 800, opacity: 0.7, marginTop: 2 }}>
                     {s.artist}
                   </div>
 
@@ -476,10 +486,6 @@ async function submitVote() {
               </div>
             );
           })}
-      </div>
-
-      <div style={{ marginTop: 18, opacity: 0.6, fontSize: 12 }}>
-        Если открыл не из Telegram — initData может быть пустой и часть функций будет ограничена.
       </div>
     </div>
   );
