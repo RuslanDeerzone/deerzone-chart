@@ -242,6 +242,83 @@ def itunes_search_track(artist: str, title: str) -> Optional[dict]:
         return None
 
 
+from typing import Any
+
+@app.get("/admin/weeks/{week_id}/votes/summary")
+def admin_votes_summary(
+    week_id: int,
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    # 🔐 админ-доступ
+    require_admin(x_admin_token)
+
+    ensure_week_exists(week_id)
+
+    # песни недели
+    items = SONGS_BY_WEEK.get(week_id, [])
+    if not isinstance(items, list):
+        items = []
+
+    # голоса недели
+    votes_map = VOTES.get(week_id, {})
+    if not isinstance(votes_map, dict):
+        votes_map = {}
+
+    rows: list[dict[str, Any]] = []
+
+    for s in items:
+        # у тебя сейчас песни хранятся как dict (из songs.json)
+        if isinstance(s, dict):
+            sid = int(s.get("id") or 0)
+            rows.append({
+                "id": sid,
+                "artist": s.get("artist"),
+                "title": s.get("title"),
+                "is_new": bool(s.get("is_new", False)),
+                "weeks_in_chart": s.get("weeks_in_chart"),
+                "source": s.get("source"),
+                "cover": s.get("cover"),
+                "preview_url": s.get("preview_url"),
+                "votes": int(votes_map.get(sid, 0)),
+            })
+        else:
+            # на случай если где-то остались SongOut объекты
+            sid = int(getattr(s, "id", 0) or 0)
+            rows.append({
+                "id": sid,
+                "artist": getattr(s, "artist", None),
+                "title": getattr(s, "title", None),
+                "is_new": bool(getattr(s, "is_new", False)),
+                "weeks_in_chart": getattr(s, "weeks_in_chart", None),
+                "source": getattr(s, "source", None),
+                "cover": getattr(s, "cover", None),
+                "preview_url": getattr(s, "preview_url", None),
+                "votes": int(votes_map.get(sid, 0)),
+            })
+
+    # сортировка: сначала по голосам (desc), потом по артисту/названию
+    def norm(x):
+        return (str(x or "")).strip().lower()
+
+    rows.sort(key=lambda r: (-int(r.get("votes", 0)), norm(r.get("artist")), norm(r.get("title"))))
+
+    return {
+        "ok": True,
+        "week_id": week_id,
+        "total_songs": len(rows),
+        "rows": rows,
+    }
+
+
+@app.get("/admin/weeks/current/votes/summary")
+def admin_votes_summary_current(
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    require_admin(x_admin_token)
+    week = get_current_week()
+    return admin_votes_summary(int(week["id"]), x_admin_token)
+
+
 # =========================
 # 4) APP = FastAPI()
 # =========================
