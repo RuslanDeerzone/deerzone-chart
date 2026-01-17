@@ -317,6 +317,13 @@ export default function Home() {
         />
       </div>
 
+      <div style={{ marginTop: 8, fontSize: 12, opacity: 0.6 }}>
+        tg: {String(!!window?.Telegram)} ·
+        webapp: {String(!!window?.Telegram?.WebApp)} ·
+        platform: {window?.Telegram?.WebApp?.platform || "n/a"} ·
+        initDataLen: {window?.Telegram?.WebApp?.initData?.length || 0}
+      </div>
+
       <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ fontSize: 18, fontWeight: 900 }}>Selected: {selectedCount}</div>
 
@@ -336,10 +343,6 @@ export default function Home() {
         >
           {isVoting ? "Sending..." : "VOTE"}
         </button>
-      </div>
-
-      <div style={{ marginTop: 8, fontSize: 12, opacity: 0.6 }}>
-        initData: {initData ? `present (${initData.length})` : "EMPTY"} · platform: {window?.Telegram?.WebApp?.platform || "n/a"}
       </div>
 
       {/* Сообщение успеха/повтора */}
