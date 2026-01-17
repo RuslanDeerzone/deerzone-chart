@@ -514,6 +514,94 @@ def admin_enrich_current_week(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def _song_to_dict(s: Any) -> dict:
+    """
+    SONGS_BY_WEEK у тебя иногда содержит dict, иногда pydantic-модель.
+    Приводим к единому виду.
+    """
+    if isinstance(s, dict):
+        return s
+    # pydantic v1/v2
+    if hasattr(s, "model_dump"):
+        return s.model_dump()
+    if hasattr(s, "dict"):
+        return s.dict()
+    # fallback на атрибуты
+    return {
+        "id": getattr(s, "id", None),
+        "artist": getattr(s, "artist", None),
+        "title": getattr(s, "title", None),
+        "is_new": getattr(s, "is_new", False),
+        "weeks_in_chart": getattr(s, "weeks_in_chart", 1),
+        "cover": getattr(s, "cover", None),
+        "preview_url": getattr(s, "preview_url", None),
+        "source": getattr(s, "source", None),
+    }
+
+
+@app.get("/admin/weeks/{week_id}/votes/summary")
+def admin_votes_summary(
+    week_id: int,
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    """
+    Админ-сводка голосов: все песни недели + голоса.
+    Сортировка: голоса DESC, затем artist/title ASC (чтобы было стабильно).
+    """
+    require_admin(x_admin_token)
+    ensure_week_exists(week_id)
+
+    items = SONGS_BY_WEEK.get(week_id, [])
+    if not isinstance(items, list):
+        items = []
+
+    votes = VOTES.get(week_id, {})
+    if not isinstance(votes, dict):
+        votes = {}
+
+    rows = []
+    for s in items:
+        sd = _song_to_dict(s)
+        sid = sd.get("id")
+        try:
+            sid_int = int(sid)
+        except Exception:
+            continue
+
+        rows.append({
+            "id": sid_int,
+            "artist": sd.get("artist"),
+            "title": sd.get("title"),
+            "votes": int(votes.get(sid_int, 0) or 0),
+            "is_new": bool(sd.get("is_new", False)),
+            "weeks_in_chart": int(sd.get("weeks_in_chart", 1) or 1),
+            "cover": sd.get("cover"),
+            "preview_url": sd.get("preview_url"),
+            "source": sd.get("source"),
+        })
+
+    rows.sort(key=lambda r: (-r["votes"], (r["artist"] or "").lower(), (r["title"] or "").lower()))
+    return {"week_id": week_id, "total_songs": len(rows), "rows": rows}
+
+
+@app.get("/admin/weeks/{week_id}/votes/top")
+def admin_votes_top(
+    week_id: int,
+    n: int = 10,
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    """
+    Топ N по голосам.
+    """
+    data = admin_votes_summary(week_id, x_admin_token)
+    return {
+        "week_id": data["week_id"],
+        "total_songs": data["total_songs"],
+        "n": n,
+        "rows": data["rows"][: max(0, int(n))],
+    }
+
+
 # Debug endpoints (можно убрать позже)
 @app.get("/__debug/songs_path")
 def debug_songs_path():
