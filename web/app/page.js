@@ -35,6 +35,23 @@ function isYoutubeUrl(url) {
 export default function Home() {
   const [week, setWeek] = useState(null);
 
+  // 🔑 Telegram initData — БЕЗ useState
+  const initData =
+    typeof window !== "undefined"
+      ? window.Telegram?.WebApp?.initData || ""
+      : "";
+
+  console.log(
+    "TG:",
+    !!window?.Telegram,
+    "WebApp:",
+    !!window?.Telegram?.WebApp,
+    "platform:",
+    window?.Telegram?.WebApp?.platform || "n/a",
+    "initDataLen:",
+    initData.length
+  );
+
   const [tab, setTab] = useState("all");
   const [search, setSearch] = useState("");
   const [songs, setSongs] = useState([]);
@@ -44,16 +61,6 @@ export default function Home() {
   const [isVoting, setIsVoting] = useState(false);
   const [voteMsg, setVoteMsg] = useState("");
 
-  // ✅ ЕДИНСТВЕННЫЙ initData
-  const [initData, setInitData] = useState("");
-
-  useEffect(() => {
-    const tg = window?.Telegram?.WebApp;
-    console.log("TG object:", tg ? "present" : "MISSING");
-    console.log("initData length:", tg?.initData?.length || 0);
-    console.log("platform:", tg?.platform || "n/a");
-    console.log("version:", tg?.version || "n/a");
-    try { tg?.ready?.(); tg?.expand?.(); } catch(e) {}
 }, []);
 
   // audio preview
