@@ -342,6 +342,10 @@ export default function Home() {
         </button>
       </div>
 
+      <div style={{ marginTop: 8, fontSize: 12, opacity: 0.6 }}>
+        initData: {initData ? `present (${initData.length})` : "EMPTY"} · platform: {window?.Telegram?.WebApp?.platform || "n/a"}
+      </div>
+
       {/* Сообщение успеха/повтора */}
       {voteMsg ? (
         <div
