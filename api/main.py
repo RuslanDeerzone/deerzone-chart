@@ -360,34 +360,36 @@ def admin_enrich_current_week(
         skipped = 0
         processed = 0
 
-        for s in items:
-            if not isinstance(s, dict):
-                continue
-            processed += 1
+for s in items:
+    if not isinstance(s, dict):
+        continue
 
-            cover = s.get("cover")
-            preview = s.get("preview_url")
+    processed += 1
 
-            # пропускаем ТОЛЬКО если уже есть и cover, и preview_url
-            if not force and cover and preview:
-            skipped += 1
-            continue
+    cover = s.get("cover")
+    preview = s.get("preview_url")
 
-            artist = str(s.get("artist") or "").strip()
-            title = str(s.get("title") or "").strip()
-            if not artist or not title:
-                continue
+    # ❗️ПРОПУСКАЕМ ТОЛЬКО ЕСЛИ УЖЕ ЕСТЬ И cover, И preview
+    if not force and cover and preview:
+        skipped += 1
+        continue
 
-            res = itunes_search_track(artist, title)
-            if not res:
-                continue
+    artist = str(s.get("artist") or "").strip()
+    title = str(s.get("title") or "").strip()
+    if not artist or not title:
+        continue
 
-            if (force or not cover) and res.get("cover"):
-                s["cover"] = res.get("cover")
-            if (force or not preview) and res.get("preview_url"):
-                s["preview_url"] = res.get("preview_url")
+    res = itunes_search_track(artist, title)
+    if not res:
+        continue
 
-            updated += 1
+    if (force or not cover) and res.get("cover"):
+        s["cover"] = res.get("cover")
+
+    if (force or not preview) and res.get("preview_url"):
+        s["preview_url"] = res.get("preview_url")
+
+    updated += 1
 
         # persist to file (железно)
         save_songs_to_file(items)
