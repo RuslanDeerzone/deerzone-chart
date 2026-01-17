@@ -42,6 +42,9 @@ export default function Home() {
   const [selected, setSelected] = useState(new Set());
   const [error, setError] = useState("");
 
+  const [isVoting, setIsVoting] = useState(false);
+
+
   // audio preview
   const audioRef = useRef(null);
   const [playingId, setPlayingId] = useState(null);
@@ -134,6 +137,60 @@ export default function Home() {
     setPlayingId(null);
   }
 
+
+async function submitVote() {
+  if (!week?.id) return;
+
+  if (!initData) {
+    setError reminding Telegram.
+    setError("Голосование доступно только при открытии через Telegram (нужен initData).");
+    return;
+  }
+
+  const songIds = Array.from(selected);
+
+  if (songIds.length === 0) return;
+
+  try {
+    setIsVoting(true);
+    setError("");
+
+    const r = await fetch(`${API_BASE}/weeks/${week.id}/vote`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Telegram-Init-Data": initData,
+      },
+      body: JSON.stringify({ song_ids: songIds }),
+    });
+
+    const parsed = await safeJson(r);
+    if (!r.ok) {
+      const detail = parsed.ok ? JSON.stringify(parsed.data) : parsed.text;
+
+      // красиво обрабатываем типовые ошибки
+      if (r.status === 401) {
+        setError("Telegram auth не найден. Открой мини-апп из Telegram.");
+      } else if (r.status === 409) {
+        setError("Ты уже голосовал на этой неделе.");
+      } else {
+        setError(`Ошибка голосования (${r.status}): ${detail}`);
+      }
+      return;
+    }
+
+    // успех
+    setSelected(new Set());
+    alert("Голос принят ✅");
+  } catch (e) {
+    console.error(e);
+    setError("Не удалось отправить голос. Проверь интернет/сервер.");
+  } finally {
+    setIsVoting(false);
+  }
+}
+
+
   async function playPreview(song) {
     try {
       if (playingId === song.id) {
@@ -177,6 +234,7 @@ export default function Home() {
 
   const selectedCount = selected.size;
 
+  
   // --- ФИЛЬТРАЦИЯ ВКЛАДОК ---
   const displaySongs = useMemo(() => {
     const list = Array.isArray(songs) ? [...songs] : [];
@@ -256,8 +314,10 @@ export default function Home() {
             cursor: selectedCount === 0 ? "not-allowed" : "pointer",
             fontWeight: 800,
           }}
-          onClick={() => alert("VOTE подключим следующим шагом")}
+          onClick={submitVote}
         >
+          {isVoting ? "Sending..." : "VOTE"}
+        </button>
           VOTE
         </button>
       </div>
