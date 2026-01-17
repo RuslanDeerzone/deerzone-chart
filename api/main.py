@@ -22,6 +22,16 @@ from pydantic import BaseModel
 BASE_DIR = Path(__file__).resolve().parent          # api/
 SONGS_PATH = BASE_DIR / "songs.json"
 
+VOTES_PATH = BASE_DIR / "votes.json"  # api/votes.json
+
+# votes structure:
+# {
+#   "<week_id>": {
+#     "<user_id>": [song_id, song_id, ...]
+#   }
+# }
+VOTES_BY_WEEK: Dict[int, Dict[str, list]] = {}
+
 CURRENT_WEEK_ID = int(os.getenv("CURRENT_WEEK_ID", "3"))
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")          # положи в Railway Variables
 
@@ -110,6 +120,45 @@ def load_songs_from_file() -> List[dict]:
 
 def save_songs_to_file(items: List[dict]) -> None:
     _atomic_write_json(SONGS_PATH, items)
+
+
+def load_votes_from_file() -> Dict[int, Dict[str, list]]:
+    if not VOTES_PATH.exists():
+        print(f"[BOOT] votes.json NOT FOUND: {VOTES_PATH}", flush=True)
+        return {}
+
+    try:
+        raw = VOTES_PATH.read_text(encoding="utf-8-sig")
+        data = json.loads(raw) if raw.strip() else {}
+        if not isinstance(data, dict):
+            print(f"[BOOT] votes.json is not dict, got {type(data)}", flush=True)
+            return {}
+
+        out: Dict[int, Dict[str, list]] = {}
+        for k, v in data.items():
+            try:
+                wk = int(k)
+            except Exception:
+                continue
+            if not isinstance(v, dict):
+                continue
+            out[wk] = v
+        print(f"[BOOT] votes.json loaded: weeks={len(out)}", flush=True)
+        return out
+    except Exception as e:
+        print(f"[BOOT] votes.json FAILED to load: {e}", flush=True)
+        return {}
+
+
+def save_votes_to_file() -> None:
+    # сохраняем железно и атомарно (как songs)
+    payload: Dict[str, Any] = {}
+    for wk, per_user in VOTES_BY_WEEK.items():
+        payload[str(wk)] = per_user
+
+    tmp = VOTES_PATH.with_suffix(VOTES_PATH.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.replace(VOTES_PATH)
 
 
 def ensure_week_exists(week_id: int) -> None:
@@ -214,6 +263,9 @@ app.add_middleware(
 def startup_event():
     items = load_songs_from_file()
     SONGS_BY_WEEK[CURRENT_WEEK_ID] = items
+# votes
+    global VOTES_BY_WEEK
+    VOTES_BY_WEEK = load_votes_from_file()
     VOTES.setdefault(CURRENT_WEEK_ID, {})
     USER_VOTES.setdefault(CURRENT_WEEK_ID, {})
 
@@ -240,6 +292,58 @@ class WeekOut(BaseModel):
     id: int
     title: str
     status: Literal["open", "closed"]
+
+
+class VoteIn(BaseModel):
+    song_ids: list[int]
+
+@app.post("/weeks/{week_id}/vote")
+def vote_week(
+    week_id: int,
+    payload: VoteIn,
+    x_telegram_init_data: Optional[str] = Header(default=None),
+):
+    # 1) Требуем Telegram initData
+    try:
+        user_id = user_id_from_telegram_init_data(x_telegram_init_data)
+    except Exception:
+        raise HTTPException(status_code=401, detail="TELEGRAM_AUTH_REQUIRED")
+
+    ensure_week_exists(week_id)
+
+    # 2) Валидируем список песен
+    song_ids = payload.song_ids if isinstance(payload.song_ids, list) else []
+    song_ids = [int(x) for x in song_ids if isinstance(x, int) or str(x).isdigit()]
+    song_ids = list(dict.fromkeys(song_ids))  # убираем дубли, сохраняя порядок
+
+    if len(song_ids) == 0:
+        raise HTTPException(status_code=400, detail="NO_SONGS_SELECTED")
+
+    # (опционально) лимит, чтобы не голосовали за весь чарт разом
+    if len(song_ids) > 10:
+        raise HTTPException(status_code=400, detail="TOO_MANY_SONGS_MAX_10")
+
+    # 3) Проверяем, что такие id реально есть в текущем списке
+    items = SONGS_BY_WEEK.get(week_id, [])
+    if not isinstance(items, list):
+        items = []
+    valid_ids = {int(s.get("id")) for s in items if isinstance(s, dict) and s.get("id") is not None}
+
+    bad = [x for x in song_ids if x not in valid_ids]
+    if bad:
+        raise HTTPException(status_code=400, detail={"UNKNOWN_SONG_IDS": bad})
+
+    # 4) Анти-дубль: один юзер = один голос на неделю
+    per_user = VOTES_BY_WEEK.setdefault(int(week_id), {})
+    uid = str(user_id)
+
+    if uid in per_user:
+        raise HTTPException(status_code=409, detail="ALREADY_VOTED")
+
+    per_user[uid] = song_ids
+    save_votes_to_file()
+
+    return {"ok": True, "week_id": week_id, "user_id": user_id, "count": len(song_ids)}
 
 
 class VoteIn(BaseModel):
