@@ -46,7 +46,15 @@ export default function Home() {
   const [isVoting, setIsVoting] = useState(false);
   const [voteMsg, setVoteMsg] = useState(""); // авто-скрываемое сообщение
 
-  const initData = useMemo(() => getInitDataSafe(), []);
+  const [initData, setInitData] = useState("");
+
+  useEffect(() => {
+    setInitData(getInitDataSafe());
+  }, []);
+  try {
+    window?.Telegram?.WebApp?.ready?.();
+    window?.Telegram?.WebApp?.expand?.();
+  } catch {}
 
   // audio preview
   const audioRef = useRef(null);
