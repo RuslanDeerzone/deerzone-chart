@@ -61,7 +61,6 @@ export default function Home() {
   const [isVoting, setIsVoting] = useState(false);
   const [voteMsg, setVoteMsg] = useState("");
 
-}, []);
 
   // audio preview
   const audioRef = useRef(null);
