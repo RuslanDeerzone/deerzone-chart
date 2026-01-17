@@ -323,9 +323,6 @@ async function submitVote() {
         >
           {isVoting ? "Sending..." : "VOTE"}
         </button>
-          VOTE
-        </button>
-      </div>
 
       {voteOk ? (
         <div
