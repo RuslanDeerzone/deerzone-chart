@@ -115,7 +115,7 @@
         "title":  "I'm Home",
         "is_new":  false,
         "weeks_in_chart":  4,
-        "cover":  "https://static.wikia.nocookie.net/kpop/images/f/f0/EXO_Reverxe_pre-save_album_cover.png/revision/latest/scale-to-width-down/1200?cb=20251215113833",
+        "cover":  null,
         "preview_url":  null,
         "youtube_url": "https://www.youtube.com/watch?v=7hTbNeHqGD8",
         "source":  "carryover"
@@ -126,7 +126,7 @@
         "title":  "Delulu",
         "is_new":  true,
         "weeks_in_chart":  1,
-        "cover":  "https://static.wikia.nocookie.net/kpop/images/b/be/KiiiKiii_Delulu_Pack_digital_album_cover.png/revision/latest/scale-to-width-down/1000?cb=20260112124118",
+        "cover":  null,
         "preview_url":  null,
         "youtube_url": "https://www.youtube.com/watch?v=BTlj6Sls7KE",
         "source":  "new"
@@ -283,7 +283,7 @@
     },
     {
         "id":  20,
-        "artist":  "Shin Soohyun (UKISS)",
+        "artist":  "Shin Soohyun",
         "title":  "Gray",
         "is_new":  true,
         "weeks_in_chart":  1,
@@ -344,7 +344,7 @@
     {
         "id":  25,
         "artist":  "ZICO & Crush",
-        "title":  "Yin and Yang (SMTM12)",
+        "title":  "Yin and Yang",
         "is_new":  true,
         "weeks_in_chart":  1,
         "cover":  null,
