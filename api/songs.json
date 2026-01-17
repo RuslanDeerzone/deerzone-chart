@@ -55,7 +55,7 @@
         "title":  "FREAK ALARM",
         "is_new":  false,
         "weeks_in_chart":  1,
-        "cover":  null,
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/5d/07/3a/5d073a67-cd64-95c1-087a-f068bf683b10/4547366795318.jpg/600x600bb.jpg",
         "preview_url":  null,
         "source":  "new"
     },
@@ -95,7 +95,7 @@
         "title":  "Blue",
         "is_new":  true,
         "weeks_in_chart":  1,
-        "cover":  null,
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/3b/da/3a/3bda3a73-cc68-4bb3-3219-4fac0b40caec/198704872495_Cover.jpg/600x600bb.webp",
         "preview_url":  null,
         "source":  "new"
     },
@@ -105,7 +105,7 @@
         "title":  "MEDUSA",
         "is_new":  true,
         "weeks_in_chart":  1,
-        "cover":  null,
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/6f/4b/3e/6f4b3e21-d943-de6c-9ced-3380191e5880/8800344687224.jpg/600x600bb.jpg",
         "preview_url":  null,
         "source":  "new"
     },
@@ -133,11 +133,11 @@
     },
     {
         "id":  15,
-        "artist":  "Inseong",
+        "artist":  "In Seong",
         "title":  "Mute is Off",
         "is_new":  true,
         "weeks_in_chart":  1,
-        "cover":  null,
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/9a/92/18/9a92182a-86a8-ffdf-0ea2-b8c5b3509612/cover_KM0024059_1.jpg/600x600bb.webp",
         "preview_url":  null,
         "source":  "new"
     },
@@ -147,7 +147,7 @@
         "title":  "Ferris wheel",
         "is_new":  true,
         "weeks_in_chart":  1,
-        "cover":  null,
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/a6/99/29/a6992985-9d7f-cc5b-0920-b58506e3b4e8/cover_KM0024071_1.jpg/600x600bb.webp",
         "preview_url":  null,
         "source":  "new"
     },
@@ -157,7 +157,7 @@
         "title":  "Dizzy",
         "is_new":  true,
         "weeks_in_chart":  1,
-        "cover":  null,
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/17/01/90/17019008-9253-b710-cba7-e229744f8bd9/8800337209631_cover.jpg/600x600bb.webp",
         "preview_url":  null,
         "source":  "new"
     },
@@ -197,7 +197,7 @@
         "title":  "PEACE",
         "is_new":  true,
         "weeks_in_chart":  1,
-        "cover":  null,
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/2a/9f/7e/2a9f7ee4-d81c-c3c9-cceb-0e63e1f65fd5/cover_KM0024077_1.jpg/600x600bb.webp",
         "preview_url":  null,
         "source":  "new"
     },
@@ -237,7 +237,7 @@
         "title":  "Sunday Morning",
         "is_new":  true,
         "weeks_in_chart":  1,
-        "cover":  null,
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/6f/3b/4d/6f3b4db5-0e18-09cc-a37c-2e1dc035d32e/25UM2IM03879.rgb.jpg/600x600bb.webp",
         "preview_url":  null,
         "source":  "new"
     },
@@ -247,7 +247,7 @@
         "title":  "TEMPO",
         "is_new":  false,
         "weeks_in_chart":  4,
-        "cover":  null,
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/8f/8f/8b/8f8f8b57-0ff4-f3c6-0e4c-adf89d0b9f17/888735954078.png/600x600bb.webp",
         "preview_url":  null,
         "source":  "carryover"
     },
@@ -257,7 +257,7 @@
         "title":  "Moonwalkin",
         "is_new":  true,
         "weeks_in_chart":  1,
-        "cover":  null,
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Video221/v4/1d/b6/5c/1db65cfb-70ac-a377-36b1-20dcef21fca4/Job6e718d98-b50f-4285-8b2b-823425f3f1eb-214360379-PreviewImage_Preview_Image_Intermediate_nonvideo_419578678_2517901435-Time1768593017825.png/600x600bb.webp",
         "preview_url":  null,
         "source":  "new"
     },
@@ -287,7 +287,7 @@
         "title":  "Gray",
         "is_new":  true,
         "weeks_in_chart":  1,
-        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music3/v4/c0/f5/71/c0f571f8-25d6-548d-638c-136dc53e12c2/8809419985708_Jacket.jpg/600x600bb.jpg",
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/5e/7e/f2/5e7ef227-f489-d888-ba00-2b0c865ae0f1/5026854403274.jpg/600x600bb.webp",
         "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/3a/19/ca/3a19caca-36cf-20a5-87f8-444785fe1950/mzaf_15575317404802359648.plus.aac.p.m4a",
         "source":  "new"
     },
@@ -347,7 +347,7 @@
         "title":  "Yin and Yang",
         "is_new":  true,
         "weeks_in_chart":  1,
-        "cover":  null,
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/68/e9/7a/68e97a8e-2eca-f99d-657d-08ec11019e94/198704944116_Cover.jpg/600x600bb.webp",
         "preview_url":  null,
         "source":  "new"
     },
@@ -357,7 +357,7 @@
         "title":  "Funky like me",
         "is_new":  true,
         "weeks_in_chart":  1,
-        "cover":  null,
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/b9/b0/59/b9b059ff-76ab-aa70-fb88-35d8937fde90/8800353119501_cover.jpg/600x600bb.webp",
         "preview_url":  null,
         "source":  "new"
     },
@@ -367,7 +367,7 @@
         "title":  "Hello Mellow",
         "is_new":  true,
         "weeks_in_chart":  1,
-        "cover":  null,
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/9a/34/33/9a34337a-0b85-0d95-d28d-3a799e5261c7/ANTCD-A0000018887.jpg/600x600bb.webp",
         "preview_url":  null,
         "source":  "new"
     },
@@ -377,7 +377,7 @@
         "title":  "Beautiful and Painful",
         "is_new":  true,
         "weeks_in_chart":  1,
-        "cover":  null,
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/14/ff/6f/14ff6f6d-bcf8-4a57-660a-81d922152142/199806763582.jpg/600x600bb.webp",
         "preview_url":  null,
         "source":  "new"
     },
@@ -387,7 +387,7 @@
         "title":  "Confetti",
         "is_new":  true,
         "weeks_in_chart":  1,
-        "cover":  null,
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/5b/04/f4/5b04f4a5-cd9d-c82c-2594-6ea28eed92c5/5026854408385.jpg/600x600bb.webp",
         "preview_url":  null,
         "source":  "new"
     },
@@ -397,9 +397,8 @@
         "title":  "Knife",
         "is_new":  true,
         "weeks_in_chart":  1,
-        "cover":  null,
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/4e/48/e2/4e48e2e1-6713-c1de-db25-7a8d27f6979e/198704914287_Cover.jpg/600x600bb.webp",
         "preview_url":  null,
         "source":  "new"
     }
 ]
-
