@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
-const LOGO_SRC = "/logo.png"; // web/public/logo.png
+const LOGO_SRC = "/logo-deerzone.png"; // web/public/logo-deerzone.png
 
 function getInitDataSafe() {
   if (typeof window === "undefined") return "";
@@ -218,7 +218,7 @@ export default function Home() {
   }}
 >
   <img
-    src={LOGO_SRC}
+    src="/logo-deerzone.png"
     alt="#deerzone chart"
     style={{
       width: "100%",
