@@ -43,6 +43,7 @@ export default function Home() {
   const [error, setError] = useState("");
 
   const [isVoting, setIsVoting] = useState(false);
+  const [voteOk, setVoteOk] = useState(false);
 
 
   // audio preview
@@ -141,15 +142,24 @@ export default function Home() {
 async function submitVote() {
   if (!week?.id) return;
 
+  // Если хочешь запретить голосование из обычного браузера — оставляем
   if (!initData) {
-    setError reminding Telegram.
     setError("Голосование доступно только при открытии через Telegram (нужен initData).");
     return;
   }
 
   const songIds = Array.from(selected);
+  const MAX = 10;
 
-  if (songIds.length === 0) return;
+  if (songIds.length === 0) {
+    setError("Выбери хотя бы одну песню.");
+    return;
+  }
+
+  if (songIds.length > MAX) {
+    setError(`Можно выбрать максимум ${MAX} песен.`);
+    return;
+  }
 
   try {
     setIsVoting(true);
@@ -165,21 +175,15 @@ async function submitVote() {
     });
 
     const parsed = await safeJson(r);
+
     if (!r.ok) {
       const detail = parsed.ok ? JSON.stringify(parsed.data) : parsed.text;
-
-      // красиво обрабатываем типовые ошибки
-      if (r.status === 401) {
-        setError("Telegram auth не найден. Открой мини-апп из Telegram.");
-      } else if (r.status === 409) {
-        setError("Ты уже голосовал на этой неделе.");
-      } else {
-        setError(`Ошибка голосования (${r.status}): ${detail}`);
-      }
+      setError(`Ошибка голосования (${r.status}): ${detail}`);
       return;
     }
 
     // успех
+    setVoteOk(true);
     setSelected(new Set());
     alert("Голос принят ✅");
   } catch (e) {
@@ -304,7 +308,8 @@ async function submitVote() {
         <div style={{ fontSize: 22, fontWeight: 800 }}>Selected: {selectedCount}</div>
 
         <button
-          disabled={selectedCount === 0}
+          disabled={selectedCount === 0|| isVoting}
+          onClick={submitVote}
           style={{
             marginLeft: "auto",
             padding: "10px 14px",
@@ -313,14 +318,29 @@ async function submitVote() {
             background: selectedCount === 0 ? "#f5f5f5" : "#fff",
             cursor: selectedCount === 0 ? "not-allowed" : "pointer",
             fontWeight: 800,
+            opacity: isVoting ? 0.6 : 1,
           }}
-          onClick={submitVote}
         >
           {isVoting ? "Sending..." : "VOTE"}
         </button>
           VOTE
         </button>
       </div>
+
+      {voteOk ? (
+        <div
+          style={{
+            marginTop: 14,
+            padding: 14,
+            borderRadius: 16,
+            border: "1px solid #c8f7d6",
+            background: "rgba(0,200,100,0.08)",
+            fontWeight: 800,
+          }}
+        >
+          Голос принят ✅
+        </div>
+       ) : null}
 
       <input
         value={search}
