@@ -208,17 +208,39 @@ export default function Home() {
     >
       <div style={{ height: 8, background: "#ff3fa4", borderRadius: 99 }} />
 
-      {/* LOGO вместо заголовка */}
-      <div style={{ marginTop: 18, display: "flex", alignItems: "center", gap: 12 }}>
-        <img
-          src={LOGO_SRC}
-          alt="#deerzone"
-          style={{ height: 44, width: "auto", display: "block" }}
-          onError={() => {
-            // если логотипа нет — просто молча ничего (чтобы не бесить)
-          }}
-        />
-      </div>
+{/* LOGO HEADER */}
+<div
+  style={{
+    marginTop: 18,
+    marginBottom: 12,
+    display: "flex",
+    justifyContent: "center",
+  }}
+>
+  <img
+    src={LOGO_SRC}
+    alt="#deerzone chart"
+    style={{
+      width: "100%",
+      maxWidth: 520,
+      height: "auto",
+      display: "block",
+    }}
+  />
+</div>
+
+<div
+  style={{
+    textAlign: "center",
+    fontSize: 14,
+    fontWeight: 800,
+    opacity: 0.55,
+    marginBottom: 10,
+    letterSpacing: 0.5,
+  }}
+>
+  weekly music chart
+</div>
 
       <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 12 }}>
         <div style={{ fontSize: 22, fontWeight: 800 }}>Selected: {selectedCount}</div>
