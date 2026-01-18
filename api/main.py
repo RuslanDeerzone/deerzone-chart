@@ -219,25 +219,64 @@ def itunes_search_track(artist: str, title: str) -> Optional[dict]:
                 "term": q,
                 "media": "music",
                 "entity": "song",
-                "limit": 5,
+                "limit": 10,
+                "country": "US",   # важный фикс: часто даёт preview там, где в других регионах его нет
+            },
+            headers={
+                "User-Agent": "deerzone-chart/1.0",
+                "Accept": "application/json",
             },
             timeout=12,
         )
+
         if r.status_code != 200:
             return None
+
         data = r.json()
         results = data.get("results") or []
         if not results:
             return None
 
-        # берём первый результат; при желании можно улучшить матчинг
-        item = results[0]
+        # 1) сначала пытаемся найти лучший матч по артисту/названию
+        a_in = re.sub(r"\s+", " ", artist.strip().lower())
+        t_in = re.sub(r"\s+", " ", title.strip().lower())
+
+        best = None
+        best_score = -1
+
+        for item in results:
+            a = re.sub(r"\s+", " ", str(item.get("artistName") or "").strip().lower())
+            t = re.sub(r"\s+", " ", str(item.get("trackName") or "").strip().lower())
+
+            score = 0
+            if a == a_in:
+                score += 3
+            elif a_in and a_in in a:
+                score += 2
+
+            if t == t_in:
+                score += 3
+            elif t_in and t_in in t:
+                score += 2
+
+            # небольшой бонус, если есть previewUrl
+            if item.get("previewUrl"):
+                score += 1
+
+            if score > best_score:
+                best_score = score
+                best = item
+
+        item = best or results[0]
+
         cover = item.get("artworkUrl100") or item.get("artworkUrl60")
         if cover:
             cover = re.sub(r"/\d+x\d+bb\.jpg", "/600x600bb.jpg", cover)
 
         preview = item.get("previewUrl")
+
         return {"cover": cover, "preview_url": preview}
+
     except Exception:
         return None
 
@@ -320,8 +359,8 @@ def vote_week(
         raise HTTPException(status_code=400, detail="NO_SONGS_SELECTED")
 
     # (опционально) лимит, чтобы не голосовали за весь чарт разом
-    if len(song_ids) > 10:
-        raise HTTPException(status_code=400, detail="TOO_MANY_SONGS_MAX_10")
+    if len(song_ids) > 20:
+        raise HTTPException(status_code=400, detail="TOO_MANY_SONGS_MAX_20")
 
     # 3) Проверяем, что такие id реально есть в текущем списке
     items = SONGS_BY_WEEK.get(week_id, [])
