@@ -44,6 +44,28 @@ export default function Home() {
 
   const [isVoting, setIsVoting] = useState(false);
   const [voteMsg, setVoteMsg] = useState("");
+  
+  const [mounted, setMounted] = useState(false);
+  const [tgInfo, setTgInfo] = useState({ tg: false, webapp: false, platform: "n/a", initLen: 0 });
+  const [initData, setInitData] = useState("");
+
+  useEffect(() => {
+    setMounted(true);
+
+    const w = typeof window !== "undefined" ? window : null;
+    const tg = !!w?.Telegram;
+    const webapp = !!w?.Telegram?.WebApp;
+    const platform = w?.Telegram?.WebApp?.platform || "n/a";
+    const init = w?.Telegram?.WebApp?.initData || "";
+
+    setInitData(init);
+    setTgInfo({ tg, webapp, platform, initLen: init.length });
+
+    try {
+      w?.Telegram?.WebApp?.ready?.();
+      w?.Telegram?.WebApp?.expand?.();
+    } catch {}
+  }, []);
 
   const voteTimer = useRef(null);
   function flash(msg) {
@@ -444,6 +466,13 @@ export default function Home() {
           );
         })}
       </div>
+
+      {mounted ? (
+        <div style={{ marginTop: 8, fontSize: 12, opacity: 0.6 }}>
+          tg: {String(tgInfo.tg)} · webapp: {String(tgInfo.webapp)} · platform: {tgInfo.platform} · initDataLen: {tgInfo.initLen}
+        </div>
+      ) : null}
+
     </div>
   );
 }
