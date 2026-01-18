@@ -46,20 +46,49 @@ export default function Home() {
   const [voteMsg, setVoteMsg] = useState("");
 
 useEffect(() => {
-  const t = window?.Telegram?.WebApp;
-  const ok = !!t;
+  let tries = 0;
+  const maxTries = 60; // ~3 сек (60 * 50ms)
+  const tickMs = 50;
 
-  if (ok) {
-    try {
-      t.ready();
-      t.expand();
-    } catch {}
-    setInitData(t.initData || "");
-    console.log("tg:", true, "webapp:", true, "platform:", t.platform, "initDataLen:", (t.initData || "").length);
-  } else {
-    setInitData("");
-    console.log("tg:", false, "webapp:", false, "platform:", "n/a", "initDataLen:", 0);
-  }
+  const timer = setInterval(() => {
+    tries += 1;
+
+    const t = window?.Telegram?.WebApp;
+
+    if (t) {
+      clearInterval(timer);
+
+      try {
+        t.ready();
+        t.expand();
+      } catch {}
+
+      const v = t.initData || "";
+      setInitData(v);
+
+      console.log(
+        "tg:",
+        true,
+        "webapp:",
+        true,
+        "platform:",
+        t.platform || "n/a",
+        "initDataLen:",
+        v.length
+      );
+
+      return;
+    }
+
+    if (tries >= maxTries) {
+      clearInterval(timer);
+      setInitData("");
+
+      console.log("tg:", false, "webapp:", false, "platform:", "n/a", "initDataLen:", 0);
+    }
+  }, tickMs);
+
+  return () => clearInterval(timer);
 }, []);
 
   // audio preview
