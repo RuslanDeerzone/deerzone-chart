@@ -4,31 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ||
-  "https://YOUR-API-RAILWAY-URL"; // <-- проверь что тут твой API, не WEB
+  "https://sincere-perception-production-65ac.up.railway.app/api"; // если у тебя API на другом URL — поправь только это
 
-function safeJson(r) {
-  return r
+function safeJson(res) {
+  return res
     .json()
     .then((data) => ({ ok: true, data }))
-    .catch(() => r.text().then((text) => ({ ok: false, text })));
-}
-
-function normalize(s) {
-  return String(s || "").trim().toLowerCase();
-}
-
-function getInitDataFromUrl() {
-  if (typeof window === "undefined") return "";
-  const sp = new URLSearchParams(window.location.search);
-  // Иногда Telegram кладёт initData в URL как tgWebAppData
-  const v = sp.get("tgWebAppData");
-  return v ? decodeURIComponent(v) : "";
-}
-
-function getPlatformFromUrl() {
-  if (typeof window === "undefined") return "";
-  const sp = new URLSearchParams(window.location.search);
-  return sp.get("tgWebAppPlatform") || "";
+    .catch(async () => ({ ok: false, text: await res.text().catch(() => "") }));
 }
 
 export default function Home() {
@@ -39,14 +21,37 @@ export default function Home() {
 
   const [search, setSearch] = useState("");
   const [songs, setSongs] = useState([]);
-  const [selected, setSelected] = useState(new Set());
+  const [selected, setSelected] = useState(() => new Set());
   const [error, setError] = useState("");
 
   const [isVoting, setIsVoting] = useState(false);
   const [voteMsg, setVoteMsg] = useState("");
-  
+
+  // чтобы не было hydration mismatch
   const [mounted, setMounted] = useState(false);
-  const [tgInfo, setTgInfo] = useState({ tg: false, webapp: false, platform: "n/a", initLen: 0 });
+
+  // telegram debug info
+  const [tgInfo, setTgInfo] = useState({
+    tg: false,
+    webapp: false,
+    platform: "n/a",
+    initLen: 0,
+  });
+
+  // initData (один-единственный источник правды)
+  const [initData, setInitData] = useState("");
+
+  // audio preview
+  const audioRef = useRef(null);
+  const [playingId, setPlayingId] = useState(null);
+
+  // авто-скрытие сообщений
+  const voteTimer = useRef(null);
+  function flash(msg) {
+    if (voteTimer.current) clearTimeout(voteTimer.current);
+    setVoteMsg(msg);
+    voteTimer.current = setTimeout(() => setVoteMsg(""), 3000);
+  }
 
   useEffect(() => {
     setMounted(true);
@@ -57,6 +62,7 @@ export default function Home() {
     const platform = w?.Telegram?.WebApp?.platform || "n/a";
     const init = w?.Telegram?.WebApp?.initData || "";
 
+    setInitData(init);
     setTgInfo({ tg, webapp, platform, initLen: init.length });
 
     try {
@@ -65,163 +71,154 @@ export default function Home() {
     } catch {}
   }, []);
 
-  const voteTimer = useRef(null);
-  function flash(msg) {
-    if (voteTimer.current) clearTimeout(voteTimer.current);
-    setVoteMsg(msg);
-    voteTimer.current = setTimeout(() => setVoteMsg(""), 3000);
-  }
-
-  // Telegram initData (берём из WebApp, а если его нет — из URL)
-  const initData = useMemo(() => {
-    if (typeof window === "undefined") return "";
-    const fromWebApp = window?.Telegram?.WebApp?.initData || "";
-    return fromWebApp || getInitDataFromUrl();
-  }, []);
-
-  const tgPresent = useMemo(
-    () => typeof window !== "undefined" && !!window?.Telegram,
-    []
-  );
-  const webAppPresent = useMemo(
-    () => typeof window !== "undefined" && !!window?.Telegram?.WebApp,
-    []
-  );
-
-  const platform = useMemo(() => {
-    if (typeof window === "undefined") return "n/a";
-    return (
-      window?.Telegram?.WebApp?.platform ||
-      getPlatformFromUrl() ||
-      "n/a"
-    );
-  }, []);
-
-  // подготовка WebApp UI
-  useEffect(() => {
-    try {
-      window?.Telegram?.WebApp?.ready?.();
-      window?.Telegram?.WebApp?.expand?.();
-    } catch {}
-  }, []);
-
-  // загрузка текущей недели + песен
-  useEffect(() => {
-    (async () => {
-      try {
-        setError("");
-
-        const w = await fetch(`${API_BASE}/weeks/current`);
-        const wj = await safeJson(w);
-        if (!w.ok) {
-          setError(
-            `Не удалось получить current week (${w.status}): ${
-              wj.ok ? JSON.stringify(wj.data) : wj.text
-            }`
-          );
-          return;
-        }
-        setWeek(wj.data);
-
-        const s = await fetch(`${API_BASE}/weeks/${wj.data.id}/songs`);
-        const sj = await safeJson(s);
-        if (!s.ok) {
-          setError(
-            `Не удалось получить songs (${s.status}): ${
-              sj.ok ? JSON.stringify(sj.data) : sj.text
-            }`
-          );
-          return;
-        }
-        setSongs(Array.isArray(sj.data) ? sj.data : []);
-      } catch (e) {
-        console.error(e);
-        setError("Ошибка сети при загрузке данных.");
-      }
-    })();
-  }, []);
-
+  // --- helpers: сортировка/фильтр ---
   const selectedCount = selected.size;
 
-  // сортировка All: по артисту A–Z (как ты хотел)
-  const baseList = useMemo(() => {
-    const list = Array.isArray(songs) ? songs.slice() : [];
-    list.sort((a, b) => {
-      const aa = normalize(a.artist);
-      const bb = normalize(b.artist);
-      if (aa < bb) return -1;
-      if (aa > bb) return 1;
-      const at = normalize(a.title);
-      const bt = normalize(b.title);
-      if (at < bt) return -1;
-      if (at > bt) return 1;
-      return 0;
-    });
-    return list;
-  }, [songs]);
+  const normalizedSearch = search.trim().toLowerCase();
 
-  const filtered = useMemo(() => {
-    const q = normalize(search);
-    let list = baseList;
+  const filteredSongs = useMemo(() => {
+    let list = Array.isArray(songs) ? songs.slice() : [];
 
-    if (tab === "new") list = list.filter((s) => !!s.is_new);
-    if (tab === "current") list = list.filter((s) => !!s.is_current);
-
-    if (!q) return list;
-    return list.filter((s) => {
-      const a = normalize(s.artist);
-      const t = normalize(s.title);
-      return a.includes(q) || t.includes(q);
-    });
-  }, [baseList, search, tab]);
-
-  // audio preview
-  const audioRef = useRef(null);
-  const [playingId, setPlayingId] = useState(null);
-
-  function playPreview(song) {
-    const url = song?.preview_url;
-    if (!url) return;
-
-    if (playingId === song.id && audioRef.current) {
-      audioRef.current.pause();
-      setPlayingId(null);
-      return;
+    // вкладки
+    if (tab === "new") {
+      list = list.filter((s) => !!s.is_new); // ожидаем поле is_new
+    } else if (tab === "current") {
+      list = list.filter((s) => !!s.is_current); // ожидаем поле is_current
     }
 
+    // поиск
+    if (normalizedSearch) {
+      list = list.filter((s) => {
+        const a = String(s.artist || "").toLowerCase();
+        const t = String(s.title || "").toLowerCase();
+        return a.includes(normalizedSearch) || t.includes(normalizedSearch);
+      });
+    }
+
+    // All всегда по артистам A–Z (и внутри по title)
+    list.sort((x, y) => {
+      const ax = String(x.artist || "").toLowerCase();
+      const ay = String(y.artist || "").toLowerCase();
+      if (ax < ay) return -1;
+      if (ax > ay) return 1;
+      const tx = String(x.title || "").toLowerCase();
+      const ty = String(y.title || "").toLowerCase();
+      if (tx < ty) return -1;
+      if (tx > ty) return 1;
+      return 0;
+    });
+
+    return list;
+  }, [songs, tab, normalizedSearch]);
+
+  // --- API: загрузка недели и песен ---
+  async function loadWeekAndSongs() {
     try {
-      if (!audioRef.current) audioRef.current = new Audio();
-      audioRef.current.pause();
-      audioRef.current.src = url;
-      audioRef.current.currentTime = 0;
-      audioRef.current.play();
-      setPlayingId(song.id);
-      audioRef.current.onended = () => setPlayingId(null);
+      setError("");
+
+      // 1) текущая неделя
+      const wRes = await fetch(`${API_BASE}/weeks/current`);
+      const wParsed = await safeJson(wRes);
+      if (!wRes.ok) {
+        setError(`Не удалось загрузить неделю (${wRes.status})`);
+        return;
+      }
+      const w = wParsed.ok ? wParsed.data : null;
+      setWeek(w);
+
+      // 2) песни недели
+      const id = w?.id;
+      if (!id) {
+        setSongs([]);
+        return;
+      }
+
+      const sRes = await fetch(`${API_BASE}/weeks/${id}/songs`);
+      const sParsed = await safeJson(sRes);
+      if (!sRes.ok) {
+        setError(`Не удалось загрузить песни (${sRes.status})`);
+        return;
+      }
+
+      const items = sParsed.ok ? sParsed.data : [];
+      setSongs(Array.isArray(items) ? items : []);
     } catch (e) {
       console.error(e);
-      setPlayingId(null);
+      setError("Ошибка загрузки. Проверь сервер/интернет.");
     }
   }
 
-  function toggleSong(id) {
+  useEffect(() => {
+    loadWeekAndSongs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // --- selection ---
+  function toggleSong(s) {
+    const id = s?.id;
+    if (!id) return;
+
     setSelected((prev) => {
       const next = new Set(prev);
+
+      // если добавляем 11-ю — запрещаем
+      if (!next.has(id) && next.size >= 10) {
+        flash("Можно выбрать максимум 10 треков");
+        return next;
+      }
+
       if (next.has(id)) next.delete(id);
       else next.add(id);
+
       return next;
     });
   }
 
+  // --- audio preview ---
+  function playPreview(s) {
+    const url = s?.preview_url;
+    const id = s?.id;
+    if (!url || !id) return;
+
+    try {
+      if (playingId === id) {
+        audioRef.current?.pause?.();
+        setPlayingId(null);
+        return;
+      }
+
+      if (!audioRef.current) {
+        audioRef.current = new Audio(url);
+      } else {
+        audioRef.current.pause?.();
+        audioRef.current.src = url;
+      }
+
+      audioRef.current.onended = () => setPlayingId(null);
+      audioRef.current.play?.();
+      setPlayingId(id);
+    } catch (e) {
+      console.error(e);
+      flash("Не удалось воспроизвести превью");
+    }
+  }
+
+  // --- vote ---
   async function submitVote() {
     if (!week?.id) return;
 
     const songIds = Array.from(selected);
+
     if (songIds.length === 0) return;
 
-    // если initData пустой — сервер честно не сможет провалидировать юзера
+    // локальная защита 10 (даже если где-то в UI проскочит)
+    if (songIds.length > 10) {
+      flash("Можно выбрать максимум 10 треков");
+      return;
+    }
+
     if (!initData) {
-      flash("initData пустой — Telegram WebApp не инициализировался.");
-      setError("initData пустой. Проверь подключение telegram-web-app.js в <head>.");
+      flash("Голосование доступно только при открытии через Telegram (нужен initData).");
       return;
     }
 
@@ -239,117 +236,123 @@ export default function Home() {
       });
 
       const parsed = await safeJson(r);
+
       if (!r.ok) {
+        const detail = parsed.ok ? JSON.stringify(parsed.data) : parsed.text;
+
+        // красивые типовые ответы
         if (r.status === 401) {
-          flash("Telegram auth не принят сервером (401).");
-          setError("401: Сервер не принял Telegram initData (проверь валидацию на API).");
+          flash("Telegram auth не найден. Открой мини-апп из Telegram.");
         } else if (r.status === 409) {
           flash("Ты уже голосовал на этой неделе.");
-          setError("Ты уже голосовал на этой неделе.");
+        } else if (r.status === 400 && detail.includes("TOO_MANY_SONGS_MAX_10")) {
+          flash("Можно выбрать максимум 10 треков");
         } else {
-          const detail = parsed.ok ? JSON.stringify(parsed.data) : parsed.text;
           flash(`Ошибка голосования (${r.status})`);
           setError(`Ошибка голосования (${r.status}): ${detail}`);
         }
         return;
       }
 
+      // успех
       setSelected(new Set());
       flash("Голос принят ✅");
     } catch (e) {
       console.error(e);
-      flash("Не удалось отправить голос.");
-      setError("Не удалось отправить голос. Проверь интернет/сервер.");
+      flash("Не удалось отправить голос. Проверь интернет/сервер.");
     } finally {
       setIsVoting(false);
     }
   }
 
-  return (
-    <div style={{ padding: 16, maxWidth: 740, margin: "0 auto" }}>
-      {/* верхняя розовая линия */}
-      <div
-        style={{
-          height: 8,
-          borderRadius: 999,
-          background: "#ff3aa7",
-          marginBottom: 14,
-        }}
-      />
+  const disabledVote = selectedCount === 0 || selectedCount > 10 || isVoting;
 
-      {/* лого/шапка (оставь как у тебя, это пример) */}
-      <div style={{ textAlign: "center", marginBottom: 14 }}>
+  return (
+    <div style={{ padding: 16, maxWidth: 720, margin: "0 auto" }}>
+      <div style={{ height: 8, borderRadius: 999, background: "#ff3aa3", marginBottom: 14 }} />
+
+      {/* LOGO */}
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
         <img
           src="/logo-deerzone.png"
           alt="#deerzone chart"
-          style={{ maxWidth: "100%", height: "auto" }}
+          style={{ maxWidth: 520, width: "100%", height: "auto" }}
         />
       </div>
 
-      {/* debug строка */}
-      <div style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>
-        tg: {String(tgPresent)} · webapp: {String(webAppPresent)} · platform:{" "}
-        {platform} · initDataLen: {initData ? initData.length : 0}
-      </div>
+      {/* debug (только после mount, чтобы не было hydration error) */}
+      {mounted ? (
+        <div style={{ marginTop: 6, marginBottom: 10, fontSize: 12, opacity: 0.6, textAlign: "center" }}>
+          tg: {String(tgInfo.tg)} · webapp: {String(tgInfo.webapp)} · platform: {tgInfo.platform} · initDataLen:{" "}
+          {tgInfo.initLen}
+        </div>
+      ) : null}
 
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}>
-        <div style={{ fontSize: 28, fontWeight: 900 }}>Selected: {selectedCount}</div>
+      {/* top row */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+        <div style={{ fontSize: 36, fontWeight: 900, letterSpacing: -1 }}>
+          Selected: {selectedCount}
+        </div>
 
         <button
-          disabled={selectedCount === 0 || isVoting}
           onClick={submitVote}
+          disabled={disabledVote}
           style={{
             marginLeft: "auto",
             padding: "12px 18px",
             borderRadius: 16,
             border: "1px solid #eaeaea",
             background: "#fff",
-            cursor: selectedCount === 0 ? "not-allowed" : "pointer",
             fontWeight: 900,
-            opacity: isVoting ? 0.6 : 1,
+            cursor: disabledVote ? "not-allowed" : "pointer",
+            opacity: disabledVote ? 0.55 : 1,
           }}
         >
           {isVoting ? "Sending..." : "VOTE"}
         </button>
       </div>
 
+      {/* flash message */}
       {voteMsg ? (
         <div
           style={{
-            marginTop: 12,
+            marginTop: 10,
             padding: 14,
             borderRadius: 16,
-            border: "1px solid #ffd1e8",
-            background: "rgba(255,58,167,0.08)",
-            fontWeight: 900,
+            border: "1px solid #ffd1dc",
+            background: "rgba(255,0,80,0.06)",
+            fontWeight: 800,
           }}
         >
           {voteMsg}
         </div>
       ) : null}
 
+      {/* error (debug details) */}
       {error ? (
         <div
           style={{
-            marginTop: 12,
+            marginTop: 10,
             padding: 14,
             borderRadius: 16,
-            border: "1px solid #ffd1d1",
-            background: "rgba(255,0,0,0.06)",
+            border: "1px solid #ffd1dc",
+            background: "rgba(255,0,80,0.06)",
             fontWeight: 800,
+            whiteSpace: "pre-wrap",
           }}
         >
           {error}
         </div>
       ) : null}
 
+      {/* search */}
       <input
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Search artist or title"
         style={{
-          marginTop: 16,
           width: "100%",
+          marginTop: 14,
           padding: "14px 16px",
           borderRadius: 16,
           border: "1px solid #eaeaea",
@@ -358,16 +361,18 @@ export default function Home() {
         }}
       />
 
+      {/* tabs */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14 }}>
         <button
           onClick={() => setTab("all")}
           style={{
-            padding: "10px 14px",
+            padding: "10px 16px",
             borderRadius: 999,
-            border: tab === "all" ? "2px solid #ff3aa7" : "1px solid #eaeaea",
+            border: tab === "all" ? "2px solid #ff3aa3" : "1px solid #eaeaea",
             background: "#fff",
             fontWeight: 900,
             cursor: "pointer",
+            color: tab === "all" ? "#ff3aa3" : "#1b1b1b",
           }}
         >
           All
@@ -376,12 +381,13 @@ export default function Home() {
         <button
           onClick={() => setTab("new")}
           style={{
-            padding: "10px 14px",
+            padding: "10px 16px",
             borderRadius: 999,
-            border: tab === "new" ? "2px solid #ff3aa7" : "1px solid #eaeaea",
+            border: tab === "new" ? "2px solid #ff3aa3" : "1px solid #eaeaea",
             background: "#fff",
             fontWeight: 900,
             cursor: "pointer",
+            color: tab === "new" ? "#ff3aa3" : "#1b1b1b",
           }}
         >
           New
@@ -390,12 +396,13 @@ export default function Home() {
         <button
           onClick={() => setTab("current")}
           style={{
-            padding: "10px 14px",
+            padding: "10px 16px",
             borderRadius: 999,
-            border: tab === "current" ? "2px solid #ff3aa7" : "1px solid #eaeaea",
+            border: tab === "current" ? "2px solid #ff3aa3" : "1px solid #eaeaea",
             background: "#fff",
             fontWeight: 900,
             cursor: "pointer",
+            color: tab === "current" ? "#ff3aa3" : "#1b1b1b",
           }}
         >
           Current
@@ -404,24 +411,24 @@ export default function Home() {
         <div style={{ marginLeft: "auto", opacity: 0.6, fontWeight: 900 }}>Artist A–Z</div>
       </div>
 
-      <div style={{ marginTop: 14 }}>
-        {filtered.map((s) => {
+      {/* list */}
+      <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+        {filteredSongs.map((s) => {
           const isSelected = selected.has(s.id);
           const isPlaying = playingId === s.id;
 
           return (
             <div
               key={s.id}
-              onClick={() => toggleSong(s.id)}
+              onClick={() => toggleSong(s)}
               style={{
                 display: "flex",
                 gap: 14,
                 padding: 14,
                 borderRadius: 18,
-                border: isSelected ? "2px solid #ff3aa7" : "1px solid #eaeaea",
-                marginBottom: 12,
-                cursor: "pointer",
+                border: isSelected ? "2px solid #ff3aa3" : "1px solid #eaeaea",
                 background: "#fff",
+                cursor: "pointer",
               }}
             >
               {s.cover ? (
@@ -434,11 +441,9 @@ export default function Home() {
                 <div style={{ width: 92, height: 92, borderRadius: 16, background: "#f2f2f2" }} />
               )}
 
-              <div>
+              <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 18, fontWeight: 900 }}>{s.title}</div>
-                <div style={{ fontSize: 14, fontWeight: 800, opacity: 0.7, marginTop: 2 }}>
-                  {s.artist}
-                </div>
+                <div style={{ fontSize: 14, fontWeight: 800, opacity: 0.7, marginTop: 2 }}>{s.artist}</div>
 
                 <button
                   onClick={(e) => {
@@ -451,7 +456,7 @@ export default function Home() {
                     borderRadius: 12,
                     border: "1px solid #eaeaea",
                     background: "#fff",
-                    cursor: "pointer",
+                    cursor: s.preview_url ? "pointer" : "not-allowed",
                     fontWeight: 900,
                     opacity: s.preview_url ? 1 : 0.4,
                   }}
@@ -465,12 +470,9 @@ export default function Home() {
         })}
       </div>
 
-      {mounted ? (
-        <div style={{ marginTop: 8, fontSize: 12, opacity: 0.6 }}>
-          tg: {String(tgInfo.tg)} · webapp: {String(tgInfo.webapp)} · platform: {tgInfo.platform} · initDataLen: {tgInfo.initLen}
-        </div>
-      ) : null}
-
+      <div style={{ marginTop: 18, opacity: 0.6, fontSize: 12 }}>
+        Если открыл не из Telegram — initData может быть пустой и часть функций будет ограничена.
+      </div>
     </div>
   );
 }
