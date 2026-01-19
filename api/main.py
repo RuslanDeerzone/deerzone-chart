@@ -13,6 +13,8 @@ import hashlib
 import traceback
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Literal, Tuple
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import requests
 from fastapi import FastAPI, Body, Header, HTTPException
@@ -35,6 +37,17 @@ VOTE_LIMIT_PER_USER = int(os.getenv("VOTE_LIMIT_PER_USER", "20"))
 
 ITUNES_COUNTRY = os.getenv("ITUNES_COUNTRY", "US")
 ITUNES_LIMIT = int(os.getenv("ITUNES_LIMIT", "5"))
+
+MSK = ZoneInfo("Europe/Moscow")
+
+VOTING_CLOSE_WEEKDAY = 5  # Saturday (Mon=0 ... Sun=6)
+VOTING_CLOSE_HOUR = 18
+VOTING_CLOSE_MINUTE = 0
+
+# где хранить момент "открытия" голосования по неделе (чтобы открытие зависело от обновления чарта)
+WEEK_META_PATH = BASE_DIR / "api" / "week_meta.json"  # если BASE_DIR уже есть
+# если у тебя нет BASE_DIR, тогда замени на:
+# WEEK_META_PATH = Path(__file__).resolve().parent / "week_meta.json"
 
 # In-memory stores
 SONGS_BY_WEEK: Dict[int, List[dict]] = {}
@@ -447,6 +460,76 @@ def itunes_search_track(artist: str, title: str) -> Optional[dict]:
         return None
 
 
+def _read_week_meta() -> dict:
+    try:
+        if not WEEK_META_PATH.exists():
+            return {}
+        raw = WEEK_META_PATH.read_text(encoding="utf-8-sig")
+        data = json.loads(raw) if raw.strip() else {}
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+def _write_week_meta(meta: dict) -> None:
+    _atomic_write_json(WEEK_META_PATH, meta)
+
+def mark_week_opened(week_id: int) -> None:
+    """
+    Вызываем, когда неделя "обновлена/опубликована".
+    С этого момента голоса разрешены до ближайшей субботы 18:00 МСК.
+    """
+    meta = _read_week_meta()
+    now = datetime.now(MSK).isoformat()
+    wk = str(int(week_id))
+    meta.setdefault(wk, {})
+    meta[wk]["opened_at"] = now
+    _write_week_meta(meta)
+
+def get_week_opened_at(week_id: int) -> datetime | None:
+    meta = _read_week_meta()
+    wk = meta.get(str(int(week_id)), {})
+    s = wk.get("opened_at")
+    if not s:
+        return None
+    try:
+        # opened_at сохраняем в ISO, читаем как aware datetime
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=MSK)
+        return dt.astimezone(MSK)
+    except Exception:
+        return None
+
+def next_saturday_close_after(dt_msk: datetime) -> datetime:
+    """
+    Ближайшая суббота 18:00 МСК, которая НЕ раньше dt_msk.
+    """
+    base = dt_msk.astimezone(MSK)
+    days_ahead = (VOTING_CLOSE_WEEKDAY - base.weekday()) % 7
+    close_day = (base + timedelta(days=days_ahead)).replace(
+        hour=VOTING_CLOSE_HOUR,
+        minute=VOTING_CLOSE_MINUTE,
+        second=0,
+        microsecond=0,
+    )
+    # если уже позже закрытия в эту субботу — берём следующую субботу
+    if close_day <= base:
+        close_day = close_day + timedelta(days=7)
+    return close_day
+
+def assert_voting_open(week_id: int) -> None:
+    opened_at = get_week_opened_at(week_id)
+    if not opened_at:
+        # неделя ещё не "опубликована" обновлением чарта
+        raise HTTPException(status_code=403, detail="VOTING_NOT_OPENED_YET")
+
+    close_at = next_saturday_close_after(opened_at)
+    now = datetime.now(MSK)
+
+    if now >= close_at:
+        raise HTTPException(status_code=403, detail="VOTING_CLOSED")
+
+
 # =========================
 # 4) APP
 # =========================
@@ -567,6 +650,7 @@ def vote_week(
     x_telegram_init_data: Optional[str] = Header(default=None),
 ):
     ensure_week_exists(week_id)
+    assert_voting_open(week_id)
 
     # строго требуем Telegram initData
     user_id = user_id_from_telegram_init_data(x_telegram_init_data)
@@ -666,6 +750,7 @@ def admin_enrich_current_week(
 
         # persist to file (железно) — ПОСЛЕ цикла
         save_songs_to_file(items)
+        mark_week_opened(week_id)
 
         # и обновим память нормализованно (чтобы is_current подсчитал и т.д.)
         SONGS_BY_WEEK[week_id] = load_songs_from_file()
