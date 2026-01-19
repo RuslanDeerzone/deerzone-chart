@@ -104,17 +104,26 @@ def load_songs_from_file() -> List[dict]:
     if not SONGS_PATH.exists():
         print(f"[BOOT] songs.json NOT FOUND: {SONGS_PATH}", flush=True)
         return []
+
     try:
         raw = SONGS_PATH.read_text(encoding="utf-8-sig")
         data = json.loads(raw)
+
+        # допускаем вариант { "items": [...] }
+        if isinstance(data, dict) and isinstance(data.get("items"), list):
+            data = data["items"]
+
         if not isinstance(data, list):
             print(f"[BOOT] songs.json is not list: {type(data)}", flush=True)
             return []
+
         data = normalize_songs(data)
         print(f"[BOOT] songs.json loaded OK: {len(data)} items", flush=True)
         return data
-    except Exception as e:
-        print(f"[BOOT] songs.json FAILED: {e}", flush=True)
+
+    except Exception:
+        print("[BOOT] songs.json FAILED:", flush=True)
+        print(traceback.format_exc(), flush=True)
         return []
 
 
