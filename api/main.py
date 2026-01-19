@@ -141,24 +141,70 @@ def normalize_songs(items: Any) -> List[dict]:
             "lock_media": lock_media,
         })
 
+        out = [x for x in out if isinstance(x, dict)]
+        if len(out) == 0 and len(data) > 0:
+            print("[BOOT] normalize_songs returned 0 items from non-empty input!", flush=True)
+            # спасаем хотя бы то, что было
+            out = [x for x in data if isinstance(x, dict)]
+
     return out
 
 
 def load_songs_from_file() -> List[dict]:
+    """
+    Надёжная загрузка songs.json:
+    - читает BOM-safe (utf-8-sig)
+    - принимает либо список [...], либо объект {"items":[...]} / {"songs":[...]} / {"3":[...]}
+    - никогда молча не "теряет" данные: логирует тип/ошибку
+    """
     if not SONGS_PATH.exists():
         print(f"[BOOT] songs.json NOT FOUND: {SONGS_PATH}", flush=True)
         return []
+
     try:
-        data = _read_json_bom_safe(SONGS_PATH)
-        if not isinstance(data, list):
-            print(f"[BOOT] songs.json is not list: {type(data)}", flush=True)
-            return []
-        items = normalize_songs(data)
-        print(f"[BOOT] songs.json loaded OK: {len(items)} items", flush=True)
-        return items
+        raw = SONGS_PATH.read_text(encoding="utf-8-sig")
     except Exception as e:
-        print(f"[BOOT] songs.json FAILED: {e}", flush=True)
+        print(f"[BOOT] songs.json READ FAILED: {e}", flush=True)
         return []
+
+    try:
+        data = json.loads(raw) if raw.strip() else []
+    except Exception as e:
+        print(f"[BOOT] songs.json JSON PARSE FAILED: {e}", flush=True)
+        # полезно увидеть начало файла в логе
+        head = raw[:200].replace("\n", "\\n")
+        print(f"[BOOT] songs.json HEAD: {head}", flush=True)
+        return []
+
+    # 1) если это dict — пробуем вытащить список песен из популярных контейнеров
+    if isinstance(data, dict):
+        # варианты контейнеров
+        for key in ("items", "songs"):
+            if isinstance(data.get(key), list):
+                data = data[key]
+                break
+
+        # вариант: ключом является номер недели ("3": [...])
+        if isinstance(data, dict):
+            wk_key = str(CURRENT_WEEK_ID)
+            if isinstance(data.get(wk_key), list):
+                data = data[wk_key]
+
+    # 2) теперь должен быть list
+    if not isinstance(data, list):
+        print(f"[BOOT] songs.json INVALID ROOT TYPE: {type(data)} (expected list)", flush=True)
+        return []
+
+    # 3) нормализация НЕ должна обнулять всё
+    try:
+        data = normalize_songs(data)
+    except Exception as e:
+        print(f"[BOOT] normalize_songs FAILED: {e}", flush=True)
+        # в крайнем случае вернём как есть, лишь бы не пропало
+        data = [x for x in data if isinstance(x, dict)]
+
+    print(f"[BOOT] songs.json loaded OK: {len(data)} items", flush=True)
+    return data
 
 
 def save_songs_to_file(items: List[dict]) -> None:
