@@ -45,7 +45,7 @@ VOTING_CLOSE_HOUR = 18
 VOTING_CLOSE_MINUTE = 0
 
 # где хранить момент "открытия" голосования по неделе (чтобы открытие зависело от обновления чарта)
-WEEK_META_PATH = BASE_DIR / "api" / "week_meta.json"  # если BASE_DIR уже есть
+WEEK_META_PATH = BASE_DIR / "week_meta.json"  # если BASE_DIR уже есть
 # если у тебя нет BASE_DIR, тогда замени на:
 # WEEK_META_PATH = Path(__file__).resolve().parent / "week_meta.json"
 
@@ -70,9 +70,22 @@ def _atomic_write_text(path: Path, text: str) -> None:
     tmp.replace(path)
 
 
-def _atomic_write_json(path: Path, obj: Any) -> None:
-    text = json.dumps(obj, ensure_ascii=False, indent=2)
-    _atomic_write_text(path, text)
+def _atomic_write_json(path: Path, obj) -> None:
+    """
+    Пишем JSON атомарно: сначала во временный файл рядом, потом replace.
+    ВАЖНО: path уже абсолютный/полный, НЕ надо добавлять API_DIR повторно.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+
+    data = json.dumps(obj, ensure_ascii=False, indent=2)
+
+    # Пишем без BOM (utf-8)
+    tmp_path.write_text(data, encoding="utf-8")
+
+    # атомарная замена
+    tmp_path.replace(path)
 
 
 def _read_json_bom_safe(path: Path) -> Any:
