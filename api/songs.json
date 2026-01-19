@@ -116,7 +116,7 @@
         "is_new":  false,
         "weeks_in_chart":  4,
         "cover":  null,
-        "preview_url": "blocked",
+        "preview_url": null,
         "source":  "carryover"
     },
     {
