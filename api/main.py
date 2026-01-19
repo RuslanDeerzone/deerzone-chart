@@ -764,6 +764,47 @@ def debug_songs_path():
     }
 
 
+@app.get("/__debug/songs_file")
+def debug_songs_file():
+    p = SONGS_PATH
+    if not p.exists():
+        return {"path": str(p), "exists": False}
+
+    # читаем байты, чтобы увидеть BOM и не упереться в декодирование
+    b = p.read_bytes()
+    bom = b.startswith(b"\xef\xbb\xbf")
+
+    head_bytes = b[:400]  # сырой хед (на всякий)
+    try:
+        head_text = head_bytes.decode("utf-8", errors="replace")
+    except Exception:
+        head_text = None
+
+    # пробуем парсить корректно (BOM-safe)
+    top_type = None
+    list_count = None
+    err = None
+    try:
+        text = b.decode("utf-8-sig")
+        data = json.loads(text)
+        top_type = type(data).__name__
+        if isinstance(data, list):
+            list_count = len(data)
+    except Exception as e:
+        err = str(e)
+        top_type = f"json_error: {err}"
+
+    return {
+        "path": str(p),
+        "exists": True,
+        "size": len(b),
+        "has_bom": bom,
+        "top_type": top_type,
+        "list_count": list_count,
+        "head": head_text[:200] if head_text else None,
+    }
+
+
 @app.get("/__debug/songs_count")
 def debug_songs_count():
     items = SONGS_BY_WEEK.get(CURRENT_WEEK_ID, [])
