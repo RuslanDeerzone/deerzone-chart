@@ -206,6 +206,11 @@ def load_songs_from_file() -> List[dict]:
     print(f"[BOOT] songs.json loaded OK: {len(data)} items", flush=True)
     return data
 
+    # 🛡️ предохранитель: если нормализация "обнулила" непустой список — возвращаем сырой список
+    if isinstance(data, list) and len(data) == 0 and isinstance(raw_data, list) and len(raw_data) > 0:
+        print("[BOOT] normalize_songs wiped songs -> fallback to raw list", flush=True)
+        data = raw_data
+
 
 def save_songs_to_file(items: List[dict]) -> None:
     # сохраняем уже нормализованный список
