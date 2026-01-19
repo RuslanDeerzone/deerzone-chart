@@ -300,17 +300,32 @@ app.add_middleware(
 # =========================
 @app.on_event("startup")
 def startup_event():
-    items = load_songs_from_file()
-    SONGS_BY_WEEK[CURRENT_WEEK_ID] = items
-# votes
     global VOTES_BY_WEEK
+
+    # --- songs ---
+    items = load_songs_from_file()
+
+    # гарантируем список
+    if not isinstance(items, list):
+        items = []
+
+    SONGS_BY_WEEK[CURRENT_WEEK_ID] = items
+
+    # --- votes ---
     VOTES_BY_WEEK = load_votes_from_file()
+
+    # гарантируем структуры на текущую неделю
     VOTES.setdefault(CURRENT_WEEK_ID, {})
     USER_VOTES.setdefault(CURRENT_WEEK_ID, {})
 
     print(f"[BOOT] CURRENT_WEEK_ID={CURRENT_WEEK_ID}", flush=True)
     print(f"[BOOT] SONGS_PATH={SONGS_PATH} exists={SONGS_PATH.exists()}", flush=True)
-    print(f"[BOOT] SONGS_COUNT={len(items)}", flush=True)
+    try:
+        sz = SONGS_PATH.stat().st_size if SONGS_PATH.exists() else None
+    except Exception:
+        sz = None
+    print(f"[BOOT] SONGS_FILE_SIZE={sz}", flush=True)
+    print(f"[BOOT] SONGS_COUNT={len(SONGS_BY_WEEK.get(CURRENT_WEEK_ID, []))}", flush=True)
 
 
 # =========================
