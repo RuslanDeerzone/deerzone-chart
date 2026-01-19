@@ -61,7 +61,7 @@ def _atomic_write_json(path: Path, data: Any) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
     text = json.dumps(data, ensure_ascii=False, indent=4)
     # ВАЖНО: без BOM. Обычный utf-8.
-    tmp.write_text(text, encoding="utf-8")
+    tmp.write_text(text, encoding="utf-8-sig")
     tmp.replace(path)
 
 
@@ -157,7 +157,7 @@ def save_votes_to_file() -> None:
         payload[str(wk)] = per_user
 
     tmp = VOTES_PATH.with_suffix(VOTES_PATH.suffix + ".tmp")
-    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8-sig")
     tmp.replace(VOTES_PATH)
 
 
