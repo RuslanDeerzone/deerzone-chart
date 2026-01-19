@@ -117,7 +117,15 @@ def load_songs_from_file() -> List[dict]:
             print(f"[BOOT] songs.json is not list: {type(data)}", flush=True)
             return []
 
-        data = normalize_songs(data)
+        # 🔥 ВАЖНО: normalize не должен “убивать” загрузку
+        try:
+            data_norm = normalize_songs(data)
+            if isinstance(data_norm, list):
+                data = data_norm
+        except Exception:
+            print("[BOOT] normalize_songs FAILED (keeping raw list):", flush=True)
+            print(traceback.format_exc(), flush=True)
+
         print(f"[BOOT] songs.json loaded OK: {len(data)} items", flush=True)
         return data
 
