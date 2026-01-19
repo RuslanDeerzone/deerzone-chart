@@ -1,234 +1,334 @@
+# api/main.py
+from __future__ import annotations
+
 # =========================
 # 1) IMPORTS
 # =========================
-import json
 import os
 import re
+import json
+import hmac
 import time
+import hashlib
 import traceback
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Any
-from urllib.parse import parse_qs, unquote
+from typing import Any, Dict, List, Optional, Literal, Tuple
 
 import requests
-from fastapi import Body, Header, HTTPException, FastAPI
+from fastapi import FastAPI, Body, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 # =========================
 # 2) CONFIG / CONSTANTS
 # =========================
-BASE_DIR = Path(__file__).resolve().parent          # api/
+BASE_DIR = Path(__file__).resolve().parent  # api/
 SONGS_PATH = BASE_DIR / "songs.json"
-
-VOTES_PATH = BASE_DIR / "votes.json"  # api/votes.json
-
-# votes structure:
-# {
-#   "<week_id>": {
-#     "<user_id>": [song_id, song_id, ...]
-#   }
-# }
-VOTES_BY_WEEK: Dict[int, Dict[str, list]] = {}
+VOTES_PATH = BASE_DIR / "votes.json"
 
 CURRENT_WEEK_ID = int(os.getenv("CURRENT_WEEK_ID", "3"))
-ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")          # положи в Railway Variables
+ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")  # желательно задать
 
-# разрешённые origins (добавь свои домены при необходимости)
-ALLOWED_ORIGINS = [
-    "https://sincere-perception-production-65ac.up.railway.app",
-    "https://web.telegram.org",
-    "http://localhost:3000",
-]
+VOTE_LIMIT_PER_USER = int(os.getenv("VOTE_LIMIT_PER_USER", "20"))
 
-# in-memory storage
+ITUNES_COUNTRY = os.getenv("ITUNES_COUNTRY", "US")
+ITUNES_LIMIT = int(os.getenv("ITUNES_LIMIT", "5"))
+
+# In-memory stores
 SONGS_BY_WEEK: Dict[int, List[dict]] = {}
-VOTES: Dict[int, Dict[int, int]] = {}               # week_id -> {song_id: votes}
-USER_VOTES: Dict[int, Dict[str, List[int]]] = {}    # week_id -> {user_id: [song_ids]}
-
-CURRENT_WEEK = {"id": CURRENT_WEEK_ID, "title": f"Week {CURRENT_WEEK_ID}", "status": "open"}  # open/closed
+# votes: week_id -> {song_id(int): votes(int)}
+VOTES: Dict[int, Dict[int, int]] = {}
+# user_votes: week_id -> {user_id(str): [song_id...]}
+USER_VOTES: Dict[int, Dict[str, List[int]]] = {}
 
 
 # =========================
-# 3) HELPERS (SONGS STORAGE "IRON MADE")
+# 3) HELPERS (IRON MADE)
 # =========================
-def _atomic_write_json(path: Path, data: Any) -> None:
-    """
-    Атомарная запись: пишем во временный файл, потом заменяем.
-    Это защищает от "пустого songs.json" при сбое записи/деплое.
-    """
+def _now_ts() -> int:
+    return int(time.time())
+
+
+def _atomic_write_text(path: Path, text: str) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
-    text = json.dumps(data, ensure_ascii=False, indent=4)
-    # ВАЖНО: без BOM. Обычный utf-8.
-    tmp.write_text(text, encoding="utf-8-sig")
+    tmp.write_text(text, encoding="utf-8")
     tmp.replace(path)
 
 
-def normalize_song(d: dict) -> dict:
+def _atomic_write_json(path: Path, obj: Any) -> None:
+    text = json.dumps(obj, ensure_ascii=False, indent=2)
+    _atomic_write_text(path, text)
+
+
+def _read_json_bom_safe(path: Path) -> Any:
     """
-    Гарантируем наличие ключей и типы.
+    BOM-safe чтение JSON:
+    - utf-8-sig снимает BOM
+    - пустой файл -> None
     """
-    out = dict(d or {})
-    # id обязателен — но если вдруг нет, ставим временно (лучше не допускать)
-    if "id" not in out:
-        out["id"] = 0
-
-    out["artist"] = str(out.get("artist") or "").strip()
-    out["title"] = str(out.get("title") or "").strip()
-
-    out["is_new"] = bool(out.get("is_new", False))
-    out["weeks_in_chart"] = int(out.get("weeks_in_chart", 1) or 1)
-
-    # cover/preview_url допускают null
-    out["cover"] = out.get("cover", None)
-    out["preview_url"] = out.get("preview_url", None)
-
-    out["source"] = str(out.get("source") or ("new" if out["is_new"] else "carryover"))
-    return out
+    raw = path.read_text(encoding="utf-8-sig")
+    if not raw.strip():
+        return None
+    return json.loads(raw)
 
 
 def normalize_songs(items: Any) -> List[dict]:
+    """
+    Нормализует массив песен:
+    - гарантирует dict
+    - гарантирует поля: id, artist, title, is_new, weeks_in_chart, source, cover, preview_url, lock_media
+    - вычисляет is_current (для вкладки Current) если его нет:
+      source == "carryover" -> is_current=True
+    """
     if not isinstance(items, list):
         return []
-    normed = [normalize_song(x) for x in items if isinstance(x, dict)]
-    # убираем явные пустышки
-    normed = [x for x in normed if x["artist"] and x["title"] and int(x["id"]) > 0]
-    return normed
+
+    out: List[dict] = []
+    seen_ids: set[int] = set()
+
+    for x in items:
+        if not isinstance(x, dict):
+            continue
+
+        try:
+            sid = int(x.get("id"))
+        except Exception:
+            continue
+        if sid <= 0:
+            continue
+        # дубль id — оставляем первый, остальные игнор (железно)
+        if sid in seen_ids:
+            continue
+        seen_ids.add(sid)
+
+        artist = str(x.get("artist") or "").strip()
+        title = str(x.get("title") or "").strip()
+
+        # itunes enrich может работать без cover/preview -> разрешаем None
+        cover = x.get("cover", None)
+        preview_url = x.get("preview_url", None)
+
+        # source: "new" | "carryover" | ...
+        source = str(x.get("source") or "").strip() or ("new" if bool(x.get("is_new")) else "carryover")
+
+        is_new = bool(x.get("is_new", False))
+        weeks_in_chart = x.get("weeks_in_chart", 1)
+        try:
+            weeks_in_chart = int(weeks_in_chart)
+        except Exception:
+            weeks_in_chart = 1
+
+        lock_media = bool(x.get("lock_media", False))
+
+        # current = carryover (если поле не задано явно)
+        if "is_current" in x:
+            is_current = bool(x.get("is_current"))
+        else:
+            is_current = (source.lower() == "carryover")
+
+        out.append({
+            "id": sid,
+            "artist": artist,
+            "title": title,
+            "is_new": is_new,
+            "is_current": is_current,
+            "weeks_in_chart": weeks_in_chart,
+            "source": source,
+            "cover": cover,
+            "preview_url": preview_url,
+            "lock_media": lock_media,
+        })
+
+    return out
 
 
 def load_songs_from_file() -> List[dict]:
-    """
-    Всегда возвращает список dict.
-    - BOM-safe (utf-8-sig)
-    - если normalize падает — НЕ теряем список
-    - поддерживает формат { "items": [...] }
-    """
     if not SONGS_PATH.exists():
         print(f"[BOOT] songs.json NOT FOUND: {SONGS_PATH}", flush=True)
         return []
-
     try:
-        raw = SONGS_PATH.read_text(encoding="utf-8-sig")
-
-        if not raw.strip():
-            print("[BOOT] songs.json is empty", flush=True)
-            return []
-
-        data = json.loads(raw)
-
-        # допускаем вариант { "items": [...] }
-        if isinstance(data, dict) and isinstance(data.get("items"), list):
-            data = data["items"]
-
+        data = _read_json_bom_safe(SONGS_PATH)
         if not isinstance(data, list):
             print(f"[BOOT] songs.json is not list: {type(data)}", flush=True)
             return []
-
-        # normalize НЕ должен убивать загрузку
-        try:
-            data_norm = normalize_songs(data)
-            if isinstance(data_norm, list):
-                data = data_norm
-        except Exception:
-            print("[BOOT] normalize_songs FAILED (keeping raw list)", flush=True)
-            print(traceback.format_exc(), flush=True)
-
-        # финальная страховка: только dict элементы
-        out = [x for x in data if isinstance(x, dict)]
-        print(f"[BOOT] songs.json loaded OK: {len(out)} items", flush=True)
-        return out
-
-    except Exception:
-        print("[BOOT] songs.json FAILED to load:", flush=True)
-        print(traceback.format_exc(), flush=True)
+        items = normalize_songs(data)
+        print(f"[BOOT] songs.json loaded OK: {len(items)} items", flush=True)
+        return items
+    except Exception as e:
+        print(f"[BOOT] songs.json FAILED: {e}", flush=True)
         return []
 
+
 def save_songs_to_file(items: List[dict]) -> None:
-    _atomic_write_json(SONGS_PATH, items)
+    # сохраняем уже нормализованный список
+    _atomic_write_json(SONGS_PATH, normalize_songs(items))
 
 
-def load_votes_from_file() -> Dict[int, Dict[str, list]]:
+def load_votes_from_file() -> Tuple[Dict[int, Dict[int, int]], Dict[int, Dict[str, List[int]]]]:
+    """
+    votes.json формат:
+    {
+      "3": {
+        "votes": { "16": 5, "8": 2 },
+        "user_votes": { "12345": [16,8] }
+      }
+    }
+    """
     if not VOTES_PATH.exists():
         print(f"[BOOT] votes.json NOT FOUND: {VOTES_PATH}", flush=True)
-        return {}
+        return {}, {}
 
     try:
-        raw = VOTES_PATH.read_text(encoding="utf-8-sig")
-        data = json.loads(raw) if raw.strip() else {}
+        data = _read_json_bom_safe(VOTES_PATH)
         if not isinstance(data, dict):
-            print(f"[BOOT] votes.json is not dict, got {type(data)}", flush=True)
-            return {}
+            print(f"[BOOT] votes.json is not dict: {type(data)}", flush=True)
+            return {}, {}
 
-        out: Dict[int, Dict[str, list]] = {}
-        for k, v in data.items():
+        votes_out: Dict[int, Dict[int, int]] = {}
+        users_out: Dict[int, Dict[str, List[int]]] = {}
+
+        for wk_str, block in data.items():
             try:
-                wk = int(k)
+                wk = int(wk_str)
             except Exception:
                 continue
-            if not isinstance(v, dict):
+            if not isinstance(block, dict):
                 continue
-            out[wk] = v
-        print(f"[BOOT] votes.json loaded: weeks={len(out)}", flush=True)
-        return out
+
+            vmap = block.get("votes", {})
+            umap = block.get("user_votes", {})
+
+            vv: Dict[int, int] = {}
+            if isinstance(vmap, dict):
+                for sid_str, cnt in vmap.items():
+                    try:
+                        sid = int(sid_str)
+                        vv[sid] = int(cnt)
+                    except Exception:
+                        continue
+
+            uu: Dict[str, List[int]] = {}
+            if isinstance(umap, dict):
+                for uid, ids in umap.items():
+                    if not isinstance(uid, str):
+                        uid = str(uid)
+                    if isinstance(ids, list):
+                        clean: List[int] = []
+                        for i in ids:
+                            try:
+                                clean.append(int(i))
+                            except Exception:
+                                pass
+                        uu[uid] = clean
+
+            votes_out[wk] = vv
+            users_out[wk] = uu
+
+        print(f"[BOOT] votes.json loaded: weeks={len(votes_out)}", flush=True)
+        return votes_out, users_out
     except Exception as e:
-        print(f"[BOOT] votes.json FAILED to load: {e}", flush=True)
-        return {}
+        print(f"[BOOT] votes.json FAILED: {e}", flush=True)
+        return {}, {}
 
 
 def save_votes_to_file() -> None:
-    # сохраняем железно и атомарно (как songs)
-    payload: Dict[str, Any] = {}
-    for wk, per_user in VOTES_BY_WEEK.items():
-        payload[str(wk)] = per_user
-
-    tmp = VOTES_PATH.with_suffix(VOTES_PATH.suffix + ".tmp")
-    tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8-sig")
-    tmp.replace(VOTES_PATH)
-
-
-def ensure_week_exists(week_id: int) -> None:
-    # НЕ затираем уже загруженные песни
-    if week_id in SONGS_BY_WEEK and isinstance(SONGS_BY_WEEK.get(week_id), list):
-        return
-    SONGS_BY_WEEK[week_id] = []
-
-
-def get_current_week() -> dict:
-    return dict(CURRENT_WEEK)
+    data: Dict[str, Any] = {}
+    for wk in set(list(VOTES.keys()) + list(USER_VOTES.keys())):
+        vmap = VOTES.get(wk, {})
+        umap = USER_VOTES.get(wk, {})
+        data[str(wk)] = {
+            "votes": {str(k): int(v) for k, v in vmap.items()},
+            "user_votes": {str(uid): [int(x) for x in xs] for uid, xs in umap.items()},
+        }
+    _atomic_write_json(VOTES_PATH, data)
 
 
 def require_admin(x_admin_token: Optional[str]) -> None:
     if not ADMIN_TOKEN:
-        # если админ-токен не задан — это ошибка конфигурации
-        raise HTTPException(status_code=500, detail="ADMIN_TOKEN_NOT_CONFIGURED")
-    if (x_admin_token or "") != ADMIN_TOKEN:
-        raise HTTPException(status_code=403, detail="BAD_ADMIN_TOKEN")
+        raise HTTPException(status_code=500, detail="ADMIN_TOKEN is not configured")
+    if not x_admin_token or x_admin_token != ADMIN_TOKEN:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+def ensure_week_exists(week_id: int) -> None:
+    if week_id != CURRENT_WEEK_ID:
+        raise HTTPException(status_code=404, detail="Week not found")
+
+
+def get_current_week() -> dict:
+    return {"id": CURRENT_WEEK_ID}
+
+
+def _telegram_check_hash(init_data: str, bot_token: str) -> Tuple[bool, Optional[str]]:
+    """
+    Telegram WebApp initData validation:
+    https://core.telegram.org/bots/webapps#validating-data-received-via-the-web-app
+    """
+    if not init_data or not bot_token:
+        return False, None
+
+    try:
+        # parse querystring
+        pairs = init_data.split("&")
+        data: Dict[str, str] = {}
+        for p in pairs:
+            if "=" not in p:
+                continue
+            k, v = p.split("=", 1)
+            data[k] = v
+
+        recv_hash = data.get("hash", "")
+        if not recv_hash:
+            return False, None
+
+        # data_check_string: sorted key=value excluding hash
+        check_items = []
+        for k in sorted(data.keys()):
+            if k == "hash":
+                continue
+            check_items.append(f"{k}={data[k]}")
+        data_check_string = "\n".join(check_items)
+
+        secret_key = hashlib.sha256(bot_token.encode("utf-8")).digest()
+        calc_hash = hmac.new(secret_key, data_check_string.encode("utf-8"), hashlib.sha256).hexdigest()
+
+        ok = hmac.compare_digest(calc_hash, recv_hash)
+
+        # user id (если есть user=JSON)
+        user_id = None
+        u = data.get("user")
+        if u:
+            try:
+                user_obj = json.loads(requests.utils.unquote(u))
+                user_id = str(user_obj.get("id"))
+            except Exception:
+                user_id = None
+
+        return ok, user_id
+    except Exception:
+        return False, None
 
 
 def user_id_from_telegram_init_data(init_data: Optional[str]) -> str:
-    """
-    Минимально практичный парсер initData:
-    - если пусто: dev-user
-    - иначе пытаемся вытащить user.id из параметра user=...
-    """
     if not init_data:
-        return "dev-user"
+        raise HTTPException(status_code=401, detail="Missing X-Telegram-Init-Data")
 
-    try:
-        # initData выглядит как querystring: "query_id=...&user=%7B...%7D&auth_date=...&hash=..."
-        qs = parse_qs(init_data, keep_blank_values=True)
-        if "user" in qs and qs["user"]:
-            user_json = unquote(qs["user"][0])
-            obj = json.loads(user_json)
-            uid = obj.get("id")
-            if uid is not None:
-                return str(uid)
-    except Exception:
-        pass
+    # если токен не задан — НЕ делаем вид, что всё ок
+    if not TELEGRAM_BOT_TOKEN:
+        raise HTTPException(status_code=500, detail="TELEGRAM_BOT_TOKEN is not configured")
 
-    # fallback — хэшируем строку стабильно
-    return f"user-{abs(hash(init_data))}"
+    ok, user_id = _telegram_check_hash(init_data, TELEGRAM_BOT_TOKEN)
+    if not ok:
+        raise HTTPException(status_code=401, detail="Invalid Telegram initData signature")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Cannot read user id from initData")
+    return user_id
+
+
+def _norm(s: Any) -> str:
+    return str(s or "").strip().lower()
 
 
 def itunes_search_track(artist: str, title: str) -> Optional[dict]:
@@ -247,16 +347,11 @@ def itunes_search_track(artist: str, title: str) -> Optional[dict]:
                 "term": q,
                 "media": "music",
                 "entity": "song",
-                "limit": 10,
-                "country": "US",   # важный фикс: часто даёт preview там, где в других регионах его нет
-            },
-            headers={
-                "User-Agent": "deerzone-chart/1.0",
-                "Accept": "application/json",
+                "limit": ITUNES_LIMIT,
+                "country": ITUNES_COUNTRY,
             },
             timeout=12,
         )
-
         if r.status_code != 200:
             return None
 
@@ -265,35 +360,29 @@ def itunes_search_track(artist: str, title: str) -> Optional[dict]:
         if not results:
             return None
 
-        # 1) сначала пытаемся найти лучший матч по артисту/названию
-        a_in = re.sub(r"\s+", " ", artist.strip().lower())
-        t_in = re.sub(r"\s+", " ", title.strip().lower())
-
+        # Лучший матч по artist/title (не просто первый)
         best = None
         best_score = -1
 
-        for item in results:
-            a = re.sub(r"\s+", " ", str(item.get("artistName") or "").strip().lower())
-            t = re.sub(r"\s+", " ", str(item.get("trackName") or "").strip().lower())
+        a0 = _norm(artist)
+        t0 = _norm(title)
 
+        for it in results:
+            a1 = _norm(it.get("artistName"))
+            t1 = _norm(it.get("trackName"))
             score = 0
-            if a == a_in:
-                score += 3
-            elif a_in and a_in in a:
+            if a0 and a0 in a1:
                 score += 2
-
-            if t == t_in:
-                score += 3
-            elif t_in and t_in in t:
+            if t0 and t0 in t1:
                 score += 2
-
-            # небольшой бонус, если есть previewUrl
-            if item.get("previewUrl"):
-                score += 1
-
+            # небольшой бонус за точное совпадение
+            if a0 == a1:
+                score += 2
+            if t0 == t1:
+                score += 3
             if score > best_score:
                 best_score = score
-                best = item
+                best = it
 
         item = best or results[0]
 
@@ -302,21 +391,23 @@ def itunes_search_track(artist: str, title: str) -> Optional[dict]:
             cover = re.sub(r"/\d+x\d+bb\.jpg", "/600x600bb.jpg", cover)
 
         preview = item.get("previewUrl")
-
         return {"cover": cover, "preview_url": preview}
-
     except Exception:
         return None
 
 
 # =========================
-# 4) APP = FastAPI()
+# 4) APP
 # =========================
 app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=[
+        "https://web.telegram.org",
+        "http://localhost:3000",
+        # сюда можешь добавить свой WEB Railway URL
+    ],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -328,138 +419,70 @@ app.add_middleware(
 # =========================
 @app.on_event("startup")
 def startup_event():
-    global VOTES_BY_WEEK
-
     # --- songs ---
     items = load_songs_from_file()
-
-    # гарантируем список
-    if not isinstance(items, list):
-        items = []
-
-    SONGS_BY_WEEK[CURRENT_WEEK_ID] = items
+    SONGS_BY_WEEK[CURRENT_WEEK_ID] = items if isinstance(items, list) else []
 
     # --- votes ---
-    VOTES_BY_WEEK = load_votes_from_file()
+    votes_loaded, users_loaded = load_votes_from_file()
+    VOTES.clear()
+    USER_VOTES.clear()
+    VOTES.update(votes_loaded)
+    USER_VOTES.update(users_loaded)
 
-    # гарантируем структуры на текущую неделю
     VOTES.setdefault(CURRENT_WEEK_ID, {})
     USER_VOTES.setdefault(CURRENT_WEEK_ID, {})
 
-    print(f"[BOOT] CURRENT_WEEK_ID={CURRENT_WEEK_ID}", flush=True)
-    print(f"[BOOT] SONGS_PATH={SONGS_PATH} exists={SONGS_PATH.exists()}", flush=True)
     try:
         sz = SONGS_PATH.stat().st_size if SONGS_PATH.exists() else None
     except Exception:
         sz = None
+
+    print(f"[BOOT] CURRENT_WEEK_ID={CURRENT_WEEK_ID}", flush=True)
+    print(f"[BOOT] SONGS_PATH={SONGS_PATH} exists={SONGS_PATH.exists()}", flush=True)
     print(f"[BOOT] SONGS_FILE_SIZE={sz}", flush=True)
     print(f"[BOOT] SONGS_COUNT={len(SONGS_BY_WEEK.get(CURRENT_WEEK_ID, []))}", flush=True)
 
 
 # =========================
-# 6) ROUTES
+# 6) MODELS
 # =========================
 class SongOut(BaseModel):
     id: int
-    title: str
     artist: str
+    title: str
     is_new: bool = False
+    is_current: bool = False
     weeks_in_chart: int = 1
+    source: str = ""
     cover: Optional[str] = None
     preview_url: Optional[str] = None
-    source: Optional[str] = "manual"
-
-
-class WeekOut(BaseModel):
-    id: int
-    title: str
-    status: Literal["open", "closed"]
+    lock_media: bool = False
 
 
 class VoteIn(BaseModel):
-    song_ids: list[int]
-
-@app.post("/weeks/{week_id}/vote")
-def vote_week(
-    week_id: int,
-    payload: VoteIn,
-    x_telegram_init_data: Optional[str] = Header(default=None),
-):
-    # 1) Требуем Telegram initData
-    try:
-        user_id = user_id_from_telegram_init_data(x_telegram_init_data)
-    except Exception:
-        raise HTTPException(status_code=401, detail="TELEGRAM_AUTH_REQUIRED")
-
-    ensure_week_exists(week_id)
-
-    # 2) Валидируем список песен
-    song_ids = payload.song_ids if isinstance(payload.song_ids, list) else []
-    song_ids = [int(x) for x in song_ids if isinstance(x, int) or str(x).isdigit()]
-    song_ids = list(dict.fromkeys(song_ids))  # убираем дубли, сохраняя порядок
-
-    if len(song_ids) == 0:
-        raise HTTPException(status_code=400, detail="NO_SONGS_SELECTED")
-
-    # (опционально) лимит, чтобы не голосовали за весь чарт разом
-    if len(song_ids) > 20:
-        raise HTTPException(status_code=400, detail="TOO_MANY_SONGS_MAX_20")
-
-    # 3) Проверяем, что такие id реально есть в текущем списке
-    items = SONGS_BY_WEEK.get(week_id, [])
-    if not isinstance(items, list):
-        items = []
-    valid_ids = {int(s.get("id")) for s in items if isinstance(s, dict) and s.get("id") is not None}
-
-    bad = [x for x in song_ids if x not in valid_ids]
-    if bad:
-        raise HTTPException(status_code=400, detail={"UNKNOWN_SONG_IDS": bad})
-
-    # 4) Анти-дубль: один юзер = один голос на неделю
-    per_user = VOTES_BY_WEEK.setdefault(int(week_id), {})
-    uid = str(user_id)
-
-    if uid in per_user:
-        raise HTTPException(status_code=409, detail="ALREADY_VOTED")
-
-    per_user[uid] = song_ids
-    save_votes_to_file()
-
-    return {"ok": True, "week_id": week_id, "user_id": user_id, "count": len(song_ids)}
+    song_ids: List[int] = Field(default_factory=list)
 
 
-class VoteIn(BaseModel):
-    song_ids: List[int] = []
-
-
-class VoteOut(BaseModel):
-    ok: bool
-    week_id: int
-    user_id: str
-    voted_song_ids: List[int]
-
-
-@app.get("/health")
-def health():
-    return {"ok": True, "ts": int(time.time())}
-
-
-@app.get("/weeks/current", response_model=WeekOut)
+# =========================
+# 7) ROUTES
+# =========================
+@app.get("/weeks/current")
 def weeks_current():
-    w = get_current_week()
-    return WeekOut(**w)
+    return get_current_week()
 
 
 @app.get("/weeks/{week_id}/songs", response_model=List[SongOut])
 def weeks_songs(
     week_id: int,
-    filter: Literal["all", "new"] = "all",
+    filter: Literal["all", "new", "current"] = "all",
     search: str = "",
     x_telegram_init_data: Optional[str] = Header(default=None),
 ):
-    # auth (в Mini App initData есть; для браузера/PS допускаем пустое)
+    # auth (в Mini App initData есть; для браузера допускаем пустое)
     try:
-        _ = user_id_from_telegram_init_data(x_telegram_init_data)
+        if x_telegram_init_data:
+            _ = user_id_from_telegram_init_data(x_telegram_init_data)
     except Exception:
         pass
 
@@ -469,61 +492,69 @@ def weeks_songs(
     if not isinstance(items, list):
         items = []
 
+    # фильтры
     if filter == "new":
-        items = [s for s in items if bool(s.get("is_new", False))]
+        items = [s for s in items if bool((s or {}).get("is_new", False))]
+    elif filter == "current":
+        items = [s for s in items if bool((s or {}).get("is_current", False))]
 
-    if search.strip():
-        q = search.strip().lower()
-        items = [s for s in items if q in f"{s.get('artist','')} {s.get('title','')}".lower()]
+    # поиск
+    q = _norm(search)
+    if q:
+        items = [
+            s for s in items
+            if q in _norm((s or {}).get("artist")) or q in _norm((s or {}).get("title"))
+        ]
 
-    # ВАЖНО: возвращаем dict-ы; pydantic сам приведёт к SongOut
+    # сортировка: artist A-Z, затем title A-Z
+    items = items[:]
+    items.sort(key=lambda s: (_norm((s or {}).get("artist")), _norm((s or {}).get("title"))))
+
     return items
 
 
-@app.post("/weeks/{week_id}/vote", response_model=VoteOut)
-def weeks_vote(
+@app.post("/weeks/{week_id}/vote")
+def vote_week(
     week_id: int,
-    payload: VoteIn,
+    body: VoteIn,
     x_telegram_init_data: Optional[str] = Header(default=None),
 ):
-    user_id = user_id_from_telegram_init_data(x_telegram_init_data)
     ensure_week_exists(week_id)
 
-    if CURRENT_WEEK["status"] != "open":
-        raise HTTPException(status_code=403, detail="VOTING_CLOSED")
+    # строго требуем Telegram initData
+    user_id = user_id_from_telegram_init_data(x_telegram_init_data)
 
-    song_ids = [int(x) for x in (payload.song_ids or [])]
+    song_ids = [int(x) for x in (body.song_ids or []) if int(x) > 0]
+    if not song_ids:
+        raise HTTPException(status_code=400, detail="song_ids is empty")
 
-    if len(song_ids) > 10:
-        raise HTTPException(status_code=400, detail="TOO_MANY_SONGS_MAX_10")
+    # лимит
+    if len(song_ids) > VOTE_LIMIT_PER_USER:
+        raise HTTPException(status_code=400, detail=f"Too many votes. Limit={VOTE_LIMIT_PER_USER}")
 
-    existing = {int(s.get("id")) for s in (SONGS_BY_WEEK.get(week_id) or []) if isinstance(s, dict)}
-    bad = [sid for sid in song_ids if sid not in existing]
-    if bad:
-        raise HTTPException(status_code=400, detail={"error": "INVALID_SONG_ID", "song_ids": bad})
-
-    USER_VOTES.setdefault(week_id, {})
-    VOTES.setdefault(week_id, {})
-
-    # снять прошлые
-    prev = USER_VOTES[week_id].get(user_id, [])
-    for sid in prev:
-        VOTES[week_id][sid] = max(0, VOTES[week_id].get(sid, 0) - 1)
-
-    # поставить новые
+    # проверка существования песен
+    items = SONGS_BY_WEEK.get(week_id, [])
+    exists = {int(s.get("id")) for s in items if isinstance(s, dict) and s.get("id") is not None}
     for sid in song_ids:
-        VOTES[week_id][sid] = VOTES[week_id].get(sid, 0) + 1
+        if sid not in exists:
+            raise HTTPException(status_code=400, detail=f"Unknown song id: {sid}")
+
+    # повторное голосование
+    USER_VOTES.setdefault(week_id, {})
+    if user_id in USER_VOTES[week_id] and USER_VOTES[week_id][user_id]:
+        raise HTTPException(status_code=409, detail="User already voted this week")
+
+    # записываем
+    VOTES.setdefault(week_id, {})
+    for sid in song_ids:
+        VOTES[week_id][sid] = int(VOTES[week_id].get(sid, 0)) + 1
 
     USER_VOTES[week_id][user_id] = song_ids
 
-    return VoteOut(ok=True, week_id=week_id, user_id=user_id, voted_song_ids=song_ids)
+    # persist
+    save_votes_to_file()
 
-
-@app.get("/weeks/{week_id}/results")
-def weeks_results(week_id: int):
-    ensure_week_exists(week_id)
-    votes = VOTES.get(week_id, {})
-    return [{"song_id": sid, "votes": votes.get(sid, 0)} for sid in sorted(votes.keys())]
+    return {"ok": True, "week_id": week_id, "user_id": user_id, "votes": len(song_ids)}
 
 
 @app.post("/admin/weeks/current/songs/enrich")
@@ -531,6 +562,10 @@ def admin_enrich_current_week(
     force: bool = Body(default=False),
     x_admin_token: Optional[str] = Header(default=None),
 ):
+    """
+    ВАЖНО: Body должен быть ЛИБО "false"/"true" (как boolean),
+    ЛИБО просто false/true, но не {"force": true}.
+    """
     try:
         require_admin(x_admin_token)
 
@@ -551,6 +586,11 @@ def admin_enrich_current_week(
                 continue
 
             processed += 1
+
+            # 🔒 ручная фиксация — НЕ трогаем
+            if s.get("lock_media") is True:
+                skipped += 1
+                continue
 
             cover = s.get("cover")
             preview = s.get("preview_url")
@@ -580,6 +620,9 @@ def admin_enrich_current_week(
         # persist to file (железно) — ПОСЛЕ цикла
         save_songs_to_file(items)
 
+        # и обновим память нормализованно (чтобы is_current подсчитал и т.д.)
+        SONGS_BY_WEEK[week_id] = load_songs_from_file()
+
         return {
             "ok": True,
             "week_id": week_id,
@@ -596,40 +639,11 @@ def admin_enrich_current_week(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-def _song_to_dict(s: Any) -> dict:
-    """
-    SONGS_BY_WEEK у тебя иногда содержит dict, иногда pydantic-модель.
-    Приводим к единому виду.
-    """
-    if isinstance(s, dict):
-        return s
-    # pydantic v1/v2
-    if hasattr(s, "model_dump"):
-        return s.model_dump()
-    if hasattr(s, "dict"):
-        return s.dict()
-    # fallback на атрибуты
-    return {
-        "id": getattr(s, "id", None),
-        "artist": getattr(s, "artist", None),
-        "title": getattr(s, "title", None),
-        "is_new": getattr(s, "is_new", False),
-        "weeks_in_chart": getattr(s, "weeks_in_chart", 1),
-        "cover": getattr(s, "cover", None),
-        "preview_url": getattr(s, "preview_url", None),
-        "source": getattr(s, "source", None),
-    }
-
-
 @app.get("/admin/weeks/{week_id}/votes/summary")
 def admin_votes_summary(
     week_id: int,
     x_admin_token: Optional[str] = Header(default=None),
 ):
-    """
-    Админ-сводка голосов: все песни недели + голоса.
-    Сортировка: голоса DESC, затем artist/title ASC (чтобы было стабильно).
-    """
     require_admin(x_admin_token)
     ensure_week_exists(week_id)
 
@@ -637,33 +651,32 @@ def admin_votes_summary(
     if not isinstance(items, list):
         items = []
 
-    votes = VOTES.get(week_id, {})
-    if not isinstance(votes, dict):
-        votes = {}
+    votes_map = VOTES.get(week_id, {})
+    if not isinstance(votes_map, dict):
+        votes_map = {}
 
-    rows = []
+    rows: List[Dict[str, Any]] = []
     for s in items:
-        sd = _song_to_dict(s)
-        sid = sd.get("id")
-        try:
-            sid_int = int(sid)
-        except Exception:
+        if not isinstance(s, dict):
             continue
-
+        sid = int(s.get("id") or 0)
         rows.append({
-            "id": sid_int,
-            "artist": sd.get("artist"),
-            "title": sd.get("title"),
-            "votes": int(votes.get(sid_int, 0) or 0),
-            "is_new": bool(sd.get("is_new", False)),
-            "weeks_in_chart": int(sd.get("weeks_in_chart", 1) or 1),
-            "cover": sd.get("cover"),
-            "preview_url": sd.get("preview_url"),
-            "source": sd.get("source"),
+            "id": sid,
+            "artist": s.get("artist"),
+            "title": s.get("title"),
+            "is_new": bool(s.get("is_new", False)),
+            "is_current": bool(s.get("is_current", False)),
+            "weeks_in_chart": s.get("weeks_in_chart"),
+            "source": s.get("source"),
+            "cover": s.get("cover"),
+            "preview_url": s.get("preview_url"),
+            "lock_media": bool(s.get("lock_media", False)),
+            "votes": int(votes_map.get(sid, 0)),
         })
 
-    rows.sort(key=lambda r: (-r["votes"], (r["artist"] or "").lower(), (r["title"] or "").lower()))
-    return {"week_id": week_id, "total_songs": len(rows), "rows": rows}
+    rows.sort(key=lambda r: (-int(r.get("votes", 0)), _norm(r.get("artist")), _norm(r.get("title"))))
+
+    return {"ok": True, "week_id": week_id, "total_songs": len(rows), "rows": rows}
 
 
 @app.get("/admin/weeks/{week_id}/votes/top")
@@ -672,19 +685,29 @@ def admin_votes_top(
     n: int = 10,
     x_admin_token: Optional[str] = Header(default=None),
 ):
-    """
-    Топ N по голосам.
-    """
     data = admin_votes_summary(week_id, x_admin_token)
+    n = max(0, int(n))
     return {
+        "ok": True,
         "week_id": data["week_id"],
         "total_songs": data["total_songs"],
         "n": n,
-        "rows": data["rows"][: max(0, int(n))],
+        "rows": data["rows"][:n],
     }
 
 
-# Debug endpoints (можно убрать позже)
+@app.get("/admin/weeks/current/votes/summary")
+def admin_votes_summary_current(
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    require_admin(x_admin_token)
+    wk = get_current_week()
+    return admin_votes_summary(int(wk["id"]), x_admin_token)
+
+
+# -------------------------
+# Debug endpoints
+# -------------------------
 @app.get("/__debug/songs_path")
 def debug_songs_path():
     return {
@@ -705,78 +728,33 @@ def debug_songs_count():
     }
 
 
-from typing import Any
+@app.get("/__debug/songs_parse")
+def debug_songs_parse():
+    """
+    ЖЕЛЕЗНЫЙ дебаг: покажет, что реально лежит в songs.json и почему не грузится.
+    """
+    try:
+        if not SONGS_PATH.exists():
+            return {"path": str(SONGS_PATH), "exists": False}
 
-@app.get("/admin/weeks/{week_id}/votes/summary")
-def admin_votes_summary(
-    week_id: int,
-    x_admin_token: Optional[str] = Header(default=None),
-):
-    # 🔐 админ-доступ
-    require_admin(x_admin_token)
+        raw = SONGS_PATH.read_text(encoding="utf-8-sig")
+        head = raw[:250]
 
-    ensure_week_exists(week_id)
+        try:
+            data = json.loads(raw) if raw.strip() else None
+            top_type = type(data).__name__
+            list_count = len(data) if isinstance(data, list) else None
+        except Exception as e:
+            top_type = f"json_error: {e}"
+            list_count = None
 
-    # песни недели
-    items = SONGS_BY_WEEK.get(week_id, [])
-    if not isinstance(items, list):
-        items = []
-
-    # голоса недели
-    votes_map = VOTES.get(week_id, {})
-    if not isinstance(votes_map, dict):
-        votes_map = {}
-
-    rows: list[dict[str, Any]] = []
-
-    for s in items:
-        # у тебя сейчас песни хранятся как dict (из songs.json)
-        if isinstance(s, dict):
-            sid = int(s.get("id") or 0)
-            rows.append({
-                "id": sid,
-                "artist": s.get("artist"),
-                "title": s.get("title"),
-                "is_new": bool(s.get("is_new", False)),
-                "weeks_in_chart": s.get("weeks_in_chart"),
-                "source": s.get("source"),
-                "cover": s.get("cover"),
-                "preview_url": s.get("preview_url"),
-                "votes": int(votes_map.get(sid, 0)),
-            })
-        else:
-            # на случай если где-то остались SongOut объекты
-            sid = int(getattr(s, "id", 0) or 0)
-            rows.append({
-                "id": sid,
-                "artist": getattr(s, "artist", None),
-                "title": getattr(s, "title", None),
-                "is_new": bool(getattr(s, "is_new", False)),
-                "weeks_in_chart": getattr(s, "weeks_in_chart", None),
-                "source": getattr(s, "source", None),
-                "cover": getattr(s, "cover", None),
-                "preview_url": getattr(s, "preview_url", None),
-                "votes": int(votes_map.get(sid, 0)),
-            })
-
-    # сортировка: сначала по голосам (desc), потом по артисту/названию
-    def norm(x):
-        return (str(x or "")).strip().lower()
-
-    rows.sort(key=lambda r: (-int(r.get("votes", 0)), norm(r.get("artist")), norm(r.get("title"))))
-
-    return {
-        "ok": True,
-        "week_id": week_id,
-        "total_songs": len(rows),
-        "rows": rows,
-    }
-
-
-@app.get("/admin/weeks/current/votes/summary")
-def admin_votes_summary_current(
-    x_admin_token: Optional[str] = Header(default=None),
-):
-    require_admin(x_admin_token)
-    week = get_current_week()
-    return admin_votes_summary(int(week["id"]), x_admin_token)
+        return {
+            "path": str(SONGS_PATH),
+            "exists": True,
+            "size": SONGS_PATH.stat().st_size,
+            "top_type": top_type,
+            "list_count": list_count,
+            "head": head,
+        }
+    except Exception as e:
+        return {"error": str(e)}
