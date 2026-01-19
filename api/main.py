@@ -512,11 +512,6 @@ def admin_enrich_current_week(
             cover = s.get("cover")
             preview = s.get("preview_url")
 
-            # 🔒 если трек помечен как ручной — НЕ трогаем cover/preview вообще
-            if s.get("lock_media") is True:
-                skipped += 1
-                continue
-
             # пропускаем ТОЛЬКО если уже есть и cover, и preview
             if not force and cover and preview:
                 skipped += 1
