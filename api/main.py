@@ -99,7 +99,10 @@ def normalize_songs(items: Any) -> List[dict]:
 
 def load_songs_from_file() -> List[dict]:
     """
-    BOM-safe чтение: utf-8-sig автоматически убирает BOM.
+    Всегда возвращает список dict.
+    - BOM-safe (utf-8-sig)
+    - если normalize падает — НЕ теряем список
+    - поддерживает формат { "items": [...] }
     """
     if not SONGS_PATH.exists():
         print(f"[BOOT] songs.json NOT FOUND: {SONGS_PATH}", flush=True)
@@ -107,6 +110,11 @@ def load_songs_from_file() -> List[dict]:
 
     try:
         raw = SONGS_PATH.read_text(encoding="utf-8-sig")
+
+        if not raw.strip():
+            print("[BOOT] songs.json is empty", flush=True)
+            return []
+
         data = json.loads(raw)
 
         # допускаем вариант { "items": [...] }
@@ -117,23 +125,24 @@ def load_songs_from_file() -> List[dict]:
             print(f"[BOOT] songs.json is not list: {type(data)}", flush=True)
             return []
 
-        # 🔥 ВАЖНО: normalize не должен “убивать” загрузку
+        # normalize НЕ должен убивать загрузку
         try:
             data_norm = normalize_songs(data)
             if isinstance(data_norm, list):
                 data = data_norm
         except Exception:
-            print("[BOOT] normalize_songs FAILED (keeping raw list):", flush=True)
+            print("[BOOT] normalize_songs FAILED (keeping raw list)", flush=True)
             print(traceback.format_exc(), flush=True)
 
-        print(f"[BOOT] songs.json loaded OK: {len(data)} items", flush=True)
-        return data
+        # финальная страховка: только dict элементы
+        out = [x for x in data if isinstance(x, dict)]
+        print(f"[BOOT] songs.json loaded OK: {len(out)} items", flush=True)
+        return out
 
     except Exception:
-        print("[BOOT] songs.json FAILED:", flush=True)
+        print("[BOOT] songs.json FAILED to load:", flush=True)
         print(traceback.format_exc(), flush=True)
         return []
-
 
 def save_songs_to_file(items: List[dict]) -> None:
     _atomic_write_json(SONGS_PATH, items)
@@ -179,8 +188,10 @@ def save_votes_to_file() -> None:
 
 
 def ensure_week_exists(week_id: int) -> None:
-    if week_id != CURRENT_WEEK_ID:
-        raise HTTPException(status_code=404, detail="WEEK_NOT_FOUND")
+    # НЕ затираем уже загруженные песни
+    if week_id in SONGS_BY_WEEK and isinstance(SONGS_BY_WEEK.get(week_id), list):
+        return
+    SONGS_BY_WEEK[week_id] = []
 
 
 def get_current_week() -> dict:
