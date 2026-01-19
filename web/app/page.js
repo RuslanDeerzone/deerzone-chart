@@ -180,7 +180,7 @@ export default function Home() {
     }
   }
 
-  // ✅ лимит 10 прямо на выборе
+  // ✅ лимит 20 прямо на выборе
   function toggleSong(id) {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -190,8 +190,8 @@ export default function Home() {
         return next;
       }
 
-      if (next.size >= 10) {
-        flash("Максимум 10 треков за голосование.");
+      if (next.size >= 20) {
+        flash("Максимум 20 треков за голосование.");
         return next;
       }
 
@@ -206,10 +206,10 @@ export default function Home() {
     const songIds = Array.from(selected);
     if (songIds.length === 0) return;
 
-    // ✅ лимит 10 на всякий случай
-    if (songIds.length > 10) {
-      flash("Максимум 10 треков за голосование.");
-      setError("Выбрано больше 10 треков. Убери лишние.");
+    // ✅ лимит 20 на всякий случай
+    if (songIds.length > 20) {
+      flash("Максимум 20 треков за голосование.");
+      setError("Выбрано больше 20 треков. Убери лишние.");
       return;
     }
 
