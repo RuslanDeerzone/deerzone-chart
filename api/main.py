@@ -403,11 +403,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://web.telegram.org",
-        "http://localhost:3000",
-        # сюда можешь добавить свой WEB Railway URL
-    ],
+    allow_origins=["*"]
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
