@@ -1,8 +1,9 @@
 {
   "current_week_id": 3,
-  "voting_open": true,
-  "voting_closes_at": "2026-01-25T15:00:00Z",
-  "3": {
-    "opened_at": "2026-01-20T21:20:00+03:00"
+  "weeks": {
+    "3": {
+      "opened_at": "2026-01-20T21:30:00+03:00",
+      "voting_closes_at": "2026-01-25T15:00:00Z"
+    }
   }
 }
