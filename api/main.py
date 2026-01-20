@@ -13,7 +13,8 @@ import hashlib
 import traceback
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Literal, Tuple
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+from datetime import timezone
 from zoneinfo import ZoneInfo
 
 import requests
@@ -740,6 +741,11 @@ def vote_week(
     x_telegram_init_data: Optional[str] = Header(default=None),
 ):
     ensure_week_exists(week_id)
+
+    meta = load_week_meta()
+    if not is_voting_open_now(meta):
+        raise HTTPException(status_code=403, detail="VOTING_CLOSED")
+    
     assert_voting_open(week_id)
 
     # строго требуем Telegram initData
@@ -816,7 +822,7 @@ def admin_enrich_current_week(
             cover = s.get("cover")
             preview = s.get("preview_url")
 
-            # пропускаем ТОЛЬКО если уже есть и cover, и preview
+            # ✅ если НЕ force — пропускаем только когда уже всё заполнено
             if not force and cover and preview:
                 skipped += 1
                 continue
