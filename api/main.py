@@ -333,21 +333,11 @@ def get_current_week() -> dict:
 
 
 def _telegram_check_hash(init_data: str, bot_token: str) -> tuple[bool, str | None, dict]:
-    """
-    Проверка initData согласно Telegram WebApp:
-    - data_check_string: key=value (кроме hash), отсортировано по key, join '\n'
-    - secret_key = sha256(bot_token)
-    - HMAC_SHA256(secret_key, data_check_string) == hash
-    Возвращает: (ok, error, parsed)
-    """
     if not init_data or not isinstance(init_data, str):
         return False, "EMPTY_INIT_DATA", {}
-
     if not bot_token:
         return False, "TELEGRAM_BOT_TOKEN_EMPTY", {}
 
-    # ВАЖНО: initData приходит как "a=..&b=..&hash=.."
-    # parse_qsl сам корректно распарсит и URL-decoding сделает 1 раз.
     try:
         pairs = parse_qsl(init_data, keep_blank_values=True)
     except Exception:
@@ -358,7 +348,6 @@ def _telegram_check_hash(init_data: str, bot_token: str) -> tuple[bool, str | No
     if not received_hash:
         return False, "NO_HASH", data
 
-    # Telegram требует исключить hash и отсортировать по ключам
     check_pairs = [(k, v) for (k, v) in data.items() if k != "hash"]
     check_pairs.sort(key=lambda kv: kv[0])
     data_check_string = "\n".join([f"{k}={v}" for k, v in check_pairs])
@@ -367,7 +356,7 @@ def _telegram_check_hash(init_data: str, bot_token: str) -> tuple[bool, str | No
     calc_hash = hmac.new(secret_key, data_check_string.encode("utf-8"), hashlib.sha256).hexdigest()
 
     if calc_hash != received_hash:
-        return False, "HASH_MISMATCH", data
+        return False, "HASH_MISMATCH", {"keys": sorted(list(data.keys()))}
 
     return True, None, data
 
@@ -377,19 +366,6 @@ def user_id_from_telegram_init_data(init_data: str | None) -> str:
     if not ok:
         raise HTTPException(status_code=401, detail=f"TELEGRAM_AUTH_FAILED:{err}")
 
-    # необязательно, но полезно: ограничение по времени (например 24 часа)
-    auth_date = data.get("auth_date")
-    try:
-        auth_ts = int(auth_date) if auth_date else 0
-    except Exception:
-        auth_ts = 0
-
-    if auth_ts:
-        now_ts = int(datetime.now(timezone.utc).timestamp())
-        if now_ts - auth_ts > 24 * 3600:
-            raise HTTPException(status_code=401, detail="TELEGRAM_AUTH_EXPIRED")
-
-    # user лежит JSON-строкой
     user_raw = data.get("user")
     if not user_raw:
         raise HTTPException(status_code=401, detail="TELEGRAM_NO_USER")
@@ -994,6 +970,18 @@ def debug_songs_count():
 @app.get("/__debug/bot_token_len")
 def debug_bot_token_len():
     return {"len": len(TELEGRAM_BOT_TOKEN or "")}
+
+
+@app.get("/__debug/telegram_auth")
+def debug_telegram_auth(x_telegram_init_data: str | None = Header(default=None)):
+    ok, err, data = _telegram_check_hash(x_telegram_init_data or "", TELEGRAM_BOT_TOKEN)
+    return {
+        "ok": ok,
+        "err": err,
+        "bot_token_len": len(TELEGRAM_BOT_TOKEN or ""),
+        "init_len": len(x_telegram_init_data or ""),
+        "keys": data.get("keys") if isinstance(data, dict) else None,
+    }
 
 
 @app.get("/__debug/songs_parse")
