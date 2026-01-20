@@ -721,7 +721,7 @@ def vote_week(
     body: VoteIn,
     x_telegram_init_data: Optional[str] = Header(default=None),
 ):
-        try:
+    try:
         ensure_week_exists(week_id)
 
         meta = load_week_meta()
