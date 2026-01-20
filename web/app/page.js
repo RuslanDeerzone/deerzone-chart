@@ -287,29 +287,6 @@ export default function Home() {
       ) : null}
 
 
-    <button
-      onClick={async () => {
-        try {
-          const r = await fetch(`${API_BASE}/__debug/bot_token_len`);
-          const t = await r.text();
-          alert(`status=${r.status}\n${t}`);
-        } catch (e) {
-          alert(`fetch failed: ${String(e)}`);
-        }
-      }}
-      style={{
-        marginTop: 10,
-        padding: "10px 14px",
-        borderRadius: 12,
-        border: "1px solid #eaeaea",
-        background: "#fff",
-        fontWeight: 900,
-      }}
-    >
-      Debug: bot_token_len
-    </button>
-
-
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}>
         <div style={{ fontSize: 28, fontWeight: 900 }}>Selected: {selectedCount}</div>
 

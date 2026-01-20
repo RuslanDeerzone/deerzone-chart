@@ -967,11 +967,6 @@ def debug_songs_count():
     }
 
 
-@app.get("/__debug/bot_token_len")
-def debug_bot_token_len():
-    return {"len": len(TELEGRAM_BOT_TOKEN or "")}
-
-
 @app.get("/__debug/telegram_auth")
 def debug_telegram_auth(x_telegram_init_data: str | None = Header(default=None)):
     ok, err, data = _telegram_check_hash(x_telegram_init_data or "", TELEGRAM_BOT_TOKEN)
