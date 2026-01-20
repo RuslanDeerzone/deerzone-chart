@@ -982,6 +982,11 @@ def debug_songs_count():
     }
 
 
+@app.get("/__debug/bot_token_len")
+def debug_bot_token_len():
+    return {"len": len(TELEGRAM_BOT_TOKEN or "")}
+
+
 @app.get("/__debug/songs_parse")
 def debug_songs_parse():
     """
