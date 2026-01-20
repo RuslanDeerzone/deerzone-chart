@@ -28,11 +28,13 @@ from pydantic import BaseModel, Field
 BASE_DIR = Path(__file__).resolve().parent  # api/
 SONGS_PATH = BASE_DIR / "songs.json"
 VOTES_PATH = BASE_DIR / "votes.json"
+WEEK_META_PATH = BASE_DIR / "week_meta.json"
 
 CURRENT_WEEK_ID = int(os.getenv("CURRENT_WEEK_ID", "3"))
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")  # желательно задать
 
+# лимит песен в одном голосовании (сколько треков можно выбрать за раз)
 VOTE_LIMIT_PER_USER = int(os.getenv("VOTE_LIMIT_PER_USER", "20"))
 
 ITUNES_COUNTRY = os.getenv("ITUNES_COUNTRY", "US")
@@ -43,11 +45,6 @@ MSK = ZoneInfo("Europe/Moscow")
 VOTING_CLOSE_WEEKDAY = 5  # Saturday (Mon=0 ... Sun=6)
 VOTING_CLOSE_HOUR = 18
 VOTING_CLOSE_MINUTE = 0
-
-# где хранить момент "открытия" голосования по неделе (чтобы открытие зависело от обновления чарта)
-WEEK_META_PATH = BASE_DIR / "week_meta.json"  # если BASE_DIR уже есть
-# если у тебя нет BASE_DIR, тогда замени на:
-# WEEK_META_PATH = Path(__file__).resolve().parent / "week_meta.json"
 
 # In-memory stores
 SONGS_BY_WEEK: Dict[int, List[dict]] = {}
@@ -124,7 +121,8 @@ def normalize_songs(items: Any) -> List[dict]:
             continue
         if sid <= 0:
             continue
-        # дубль id — оставляем первый, остальные игнор (железно)
+
+        # дубль id — оставляем первый
         if sid in seen_ids:
             continue
         seen_ids.add(sid)
@@ -132,14 +130,15 @@ def normalize_songs(items: Any) -> List[dict]:
         artist = str(x.get("artist") or "").strip()
         title = str(x.get("title") or "").strip()
 
-        # itunes enrich может работать без cover/preview -> разрешаем None
         cover = x.get("cover", None)
         preview_url = x.get("preview_url", None)
 
-        # source: "new" | "carryover" | ...
-        source = str(x.get("source") or "").strip() or ("new" if bool(x.get("is_new")) else "carryover")
+        source = str(x.get("source") or "").strip()
+        if not source:
+            source = "new" if bool(x.get("is_new")) else "carryover"
 
         is_new = bool(x.get("is_new", False))
+
         weeks_in_chart = x.get("weeks_in_chart", 1)
         try:
             weeks_in_chart = int(weeks_in_chart)
@@ -148,7 +147,6 @@ def normalize_songs(items: Any) -> List[dict]:
 
         lock_media = bool(x.get("lock_media", False))
 
-        # current = carryover (если поле не задано явно)
         if "is_current" in x:
             is_current = bool(x.get("is_current"))
         else:
@@ -167,12 +165,6 @@ def normalize_songs(items: Any) -> List[dict]:
             "lock_media": lock_media,
         })
 
-        out = [x for x in out if isinstance(x, dict)]
-        if len(out) == 0 and len(data) > 0:
-            print("[BOOT] normalize_songs returned 0 items from non-empty input!", flush=True)
-            # спасаем хотя бы то, что было
-            out = [x for x in data if isinstance(x, dict)]
-
     return out
 
 
@@ -181,7 +173,7 @@ def load_songs_from_file() -> List[dict]:
     Надёжная загрузка songs.json:
     - читает BOM-safe (utf-8-sig)
     - принимает либо список [...], либо объект {"items":[...]} / {"songs":[...]} / {"3":[...]}
-    - никогда молча не "теряет" данные: логирует тип/ошибку
+    - НЕ теряет данные из-за нормализации
     """
     if not SONGS_PATH.exists():
         print(f"[BOOT] songs.json NOT FOUND: {SONGS_PATH}", flush=True)
@@ -194,17 +186,17 @@ def load_songs_from_file() -> List[dict]:
         return []
 
     try:
-        data = json.loads(raw) if raw.strip() else []
+        loaded = json.loads(raw) if raw.strip() else []
     except Exception as e:
         print(f"[BOOT] songs.json JSON PARSE FAILED: {e}", flush=True)
-        # полезно увидеть начало файла в логе
-        head = raw[:200].replace("\n", "\\n")
+        head = raw[:250].replace("\n", "\\n")
         print(f"[BOOT] songs.json HEAD: {head}", flush=True)
         return []
 
-    # 1) если это dict — пробуем вытащить список песен из популярных контейнеров
+    data = loaded
+
+    # если root dict — пробуем контейнеры
     if isinstance(data, dict):
-        # варианты контейнеров
         for key in ("items", "songs"):
             if isinstance(data.get(key), list):
                 data = data[key]
@@ -216,21 +208,20 @@ def load_songs_from_file() -> List[dict]:
             if isinstance(data.get(wk_key), list):
                 data = data[wk_key]
 
-    # 2) теперь должен быть list
     if not isinstance(data, list):
         print(f"[BOOT] songs.json INVALID ROOT TYPE: {type(data)} (expected list)", flush=True)
         return []
 
-    # 3) нормализация НЕ должна обнулять всё
-    try:
-        data = normalize_songs(data)
-    except Exception as e:
-        print(f"[BOOT] normalize_songs FAILED: {e}", flush=True)
-        # в крайнем случае вернём как есть, лишь бы не пропало
-        data = [x for x in data if isinstance(x, dict)]
+    raw_list = [x for x in data if isinstance(x, dict)]
+    norm_list = normalize_songs(raw_list)
 
-    print(f"[BOOT] songs.json loaded OK: {len(data)} items", flush=True)
-    return data
+    # если нормализация вдруг вернула 0, но данные были — не теряем
+    if len(norm_list) == 0 and len(raw_list) > 0:
+        print("[BOOT] normalize_songs returned 0 from non-empty input -> fallback to raw", flush=True)
+        return raw_list
+
+    print(f"[BOOT] songs.json loaded OK: {len(norm_list)} items", flush=True)
+    return norm_list
 
     # 🛡️ предохранитель: если нормализация "обнулила" непустой список — возвращаем сырой список
     if isinstance(data, list) and len(data) == 0 and isinstance(raw_data, list) and len(raw_data) > 0:
@@ -483,20 +474,97 @@ def _read_week_meta() -> dict:
     except Exception:
         return {}
 
-def _write_week_meta(meta: dict) -> None:
+# =========================
+# WEEK META (voting window)
+# =========================
+
+def load_week_meta() -> dict:
+    """
+    Формат файла week_meta.json:
+    {
+      "weeks": {
+        "3": { "opened_at": "...", "voting_closes_at": "2026-01-24T15:00:00Z" }
+      }
+    }
+    """
+    if not WEEK_META_PATH.exists():
+        return {"weeks": {}}
+
+    try:
+        raw = WEEK_META_PATH.read_text(encoding="utf-8-sig")
+        data = json.loads(raw) if raw.strip() else {}
+        if not isinstance(data, dict):
+            return {"weeks": {}}
+        weeks = data.get("weeks")
+        if not isinstance(weeks, dict):
+            weeks = {}
+        return {"weeks": weeks}
+    except Exception as e:
+        print(f"[BOOT] week_meta.json FAILED: {e}", flush=True)
+        return {"weeks": {}}
+
+def save_week_meta(meta: dict) -> None:
     _atomic_write_json(WEEK_META_PATH, meta)
 
-def mark_week_opened(week_id: int) -> None:
+def next_saturday_18_msk_iso(now_utc: Optional[datetime] = None) -> str:
+    # ближайшая суббота 18:00 МСК в UTC ISO ("...Z")
+    if now_utc is None:
+        now_utc = datetime.now(timezone.utc)
+
+    now_msk = now_utc.astimezone(MSK)
+    days_ahead = (VOTING_CLOSE_WEEKDAY - now_msk.weekday()) % 7
+
+    target = now_msk.replace(
+        hour=VOTING_CLOSE_HOUR,
+        minute=VOTING_CLOSE_MINUTE,
+        second=0,
+        microsecond=0,
+    ) + timedelta(days=days_ahead)
+
+    if target <= now_msk:
+        target += timedelta(days=7)
+
+    target_utc = target.astimezone(timezone.utc)
+    return target_utc.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+def get_week_voting_closes_at(meta: dict, week_id: int) -> str:
+    weeks = meta.get("weeks") if isinstance(meta, dict) else None
+    if not isinstance(weeks, dict):
+        weeks = {}
+    wk = weeks.get(str(int(week_id)))
+    if isinstance(wk, dict) and wk.get("voting_closes_at"):
+        return str(wk.get("voting_closes_at"))
+    return next_saturday_18_msk_iso()
+
+def is_voting_open_now(meta: dict, week_id: int) -> bool:
+    closes_at = get_week_voting_closes_at(meta, week_id)
+
+    try:
+        closes_dt = datetime.fromisoformat(closes_at.replace("Z", "+00:00"))
+    except Exception:
+        # если руками сломали формат — не блокируем навсегда
+        return True
+
+    return datetime.now(timezone.utc) < closes_dt
+
+def mark_week_opened(week_id: int) -> dict:
     """
-    Вызываем, когда неделя "обновлена/опубликована".
+    Вызываем, когда неделя обновлена/опубликована.
     С этого момента голоса разрешены до ближайшей субботы 18:00 МСК.
     """
-    meta = _read_week_meta()
-    now = datetime.now(MSK).isoformat()
-    wk = str(int(week_id))
-    meta.setdefault(wk, {})
-    meta[wk]["opened_at"] = now
-    _write_week_meta(meta)
+    meta = load_week_meta()
+    weeks = meta.get("weeks")
+    if not isinstance(weeks, dict):
+        weeks = {}
+        meta["weeks"] = weeks
+
+    wk_key = str(int(week_id))
+    weeks.setdefault(wk_key, {})
+    weeks[wk_key]["opened_at"] = datetime.now(MSK).replace(microsecond=0).isoformat()
+    weeks[wk_key]["voting_closes_at"] = next_saturday_18_msk_iso()
+
+    save_week_meta(meta)
+    return meta
 
 def get_week_opened_at(week_id: int) -> datetime | None:
     meta = _read_week_meta()
@@ -562,6 +630,15 @@ app.add_middleware(
 # =========================
 @app.on_event("startup")
 def startup_event():
+    global CURRENT_WEEK_ID
+
+    meta = load_week_meta()
+    # если в meta нет current_week_id — оставляем env как есть
+    try:
+        CURRENT_WEEK_ID = int(meta.get("current_week_id") or CURRENT_WEEK_ID)
+    except Exception:
+        pass
+
     # --- songs ---
     items = load_songs_from_file()
     SONGS_BY_WEEK[CURRENT_WEEK_ID] = items if isinstance(items, list) else []
