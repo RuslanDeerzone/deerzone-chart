@@ -13,8 +13,7 @@ import hashlib
 import traceback
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Literal, Tuple
-from datetime import datetime, timedelta
-from datetime import timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import requests
@@ -166,6 +165,8 @@ def normalize_songs(items: Any) -> List[dict]:
             "lock_media": lock_media,
         })
 
+    # финальная страховка: только dict
+    out = [x for x in out if isinstance(x, dict)]
     return out
 
 
@@ -740,49 +741,56 @@ def vote_week(
     body: VoteIn,
     x_telegram_init_data: Optional[str] = Header(default=None),
 ):
-    ensure_week_exists(week_id)
+    try:
+        ensure_week_exists(week_id)
 
-    meta = load_week_meta()
-    if not is_voting_open_now(meta):
-        raise HTTPException(status_code=403, detail="VOTING_CLOSED")
-    
-    assert_voting_open(week_id)
+        meta = load_week_meta()
+        if not is_voting_open_now(meta):
+            raise HTTPException(status_code=403, detail="VOTING_CLOSED")
 
-    # строго требуем Telegram initData
-    user_id = user_id_from_telegram_init_data(x_telegram_init_data)
+        assert_voting_open(week_id)
 
-    song_ids = [int(x) for x in (body.song_ids or []) if int(x) > 0]
-    if not song_ids:
-        raise HTTPException(status_code=400, detail="song_ids is empty")
+        # строго требуем Telegram initData
+        user_id = user_id_from_telegram_init_data(x_telegram_init_data)
 
-    # лимит
-    if len(song_ids) > VOTE_LIMIT_PER_USER:
-        raise HTTPException(status_code=400, detail=f"Too many votes. Limit={VOTE_LIMIT_PER_USER}")
+        song_ids = [int(x) for x in (body.song_ids or []) if int(x) > 0]
+        if not song_ids:
+            raise HTTPException(status_code=400, detail="song_ids is empty")
 
-    # проверка существования песен
-    items = SONGS_BY_WEEK.get(week_id, [])
-    exists = {int(s.get("id")) for s in items if isinstance(s, dict) and s.get("id") is not None}
-    for sid in song_ids:
-        if sid not in exists:
-            raise HTTPException(status_code=400, detail=f"Unknown song id: {sid}")
+        # лимит
+        if len(song_ids) > VOTE_LIMIT_PER_USER:
+            raise HTTPException(status_code=400, detail=f"Too many votes. Limit={VOTE_LIMIT_PER_USER}")
 
-    # повторное голосование
-    USER_VOTES.setdefault(week_id, {})
-    if user_id in USER_VOTES[week_id] and USER_VOTES[week_id][user_id]:
-        raise HTTPException(status_code=409, detail="User already voted this week")
+        # проверка существования песен
+        items = SONGS_BY_WEEK.get(week_id, [])
+        exists = {int(s.get("id")) for s in items if isinstance(s, dict) and s.get("id") is not None}
+        for sid in song_ids:
+            if sid not in exists:
+                raise HTTPException(status_code=400, detail=f"Unknown song id: {sid}")
 
-    # записываем
-    VOTES.setdefault(week_id, {})
-    for sid in song_ids:
-        VOTES[week_id][sid] = int(VOTES[week_id].get(sid, 0)) + 1
+        # повторное голосование
+        USER_VOTES.setdefault(week_id, {})
+        if user_id in USER_VOTES[week_id] and USER_VOTES[week_id][user_id]:
+            raise HTTPException(status_code=409, detail="User already voted this week")
 
-    USER_VOTES[week_id][user_id] = song_ids
+        # записываем
+        VOTES.setdefault(week_id, {})
+        for sid in song_ids:
+            VOTES[week_id][sid] = int(VOTES[week_id].get(sid, 0)) + 1
 
-    # persist
-    save_votes_to_file()
+        USER_VOTES[week_id][user_id] = song_ids
 
-    return {"ok": True, "week_id": week_id, "user_id": user_id, "votes": len(song_ids)}
+        # persist
+        save_votes_to_file()
 
+        return {"ok": True, "week_id": week_id, "user_id": user_id, "votes": len(song_ids)}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print("❌ VOTE CRASH", flush=True)
+        print(traceback.format_exc(), flush=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/admin/weeks/current/songs/enrich")
 def admin_enrich_current_week(
