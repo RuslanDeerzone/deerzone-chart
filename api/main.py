@@ -837,6 +837,9 @@ def admin_enrich_current_week(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class SongsReplaceIn(BaseModel):
+    items: List[dict]
+
 @app.post("/admin/weeks/{week_id}/songs/replace"]
 def admin_replace_songs(
     week_id: int,
