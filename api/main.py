@@ -745,9 +745,6 @@ def vote_week(
         ensure_week_exists(week_id)
 
         meta = load_week_meta()
-        if not is_voting_open_now(meta):
-            raise HTTPException(status_code=403, detail="VOTING_CLOSED")
-
         assert_voting_open(week_id)
 
         # строго требуем Telegram initData
