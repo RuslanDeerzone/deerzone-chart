@@ -482,10 +482,13 @@ def _read_week_meta() -> dict:
 
 def load_week_meta() -> dict:
     """
-    Формат файла week_meta.json:
+    week_meta.json:
     {
       "weeks": {
-        "3": { "opened_at": "...", "voting_closes_at": "2026-01-24T15:00:00Z" }
+        "3": {
+          "opened_at": "2026-01-20T12:00:00+03:00",
+          "voting_closes_at": "2026-01-24T15:00:00Z"
+        }
       }
     }
     """
@@ -509,7 +512,6 @@ def save_week_meta(meta: dict) -> None:
     _atomic_write_json(WEEK_META_PATH, meta)
 
 def next_saturday_18_msk_iso(now_utc: Optional[datetime] = None) -> str:
-    # ближайшая суббота 18:00 МСК в UTC ISO ("...Z")
     if now_utc is None:
         now_utc = datetime.now(timezone.utc)
 
@@ -529,31 +531,52 @@ def next_saturday_18_msk_iso(now_utc: Optional[datetime] = None) -> str:
     target_utc = target.astimezone(timezone.utc)
     return target_utc.replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
-def get_week_voting_closes_at(meta: dict, week_id: int) -> str:
+def _get_week_block(meta: dict, week_id: int) -> dict:
     weeks = meta.get("weeks") if isinstance(meta, dict) else None
     if not isinstance(weeks, dict):
-        weeks = {}
+        return {}
     wk = weeks.get(str(int(week_id)))
-    if isinstance(wk, dict) and wk.get("voting_closes_at"):
-        return str(wk.get("voting_closes_at"))
-    return next_saturday_18_msk_iso()
+    return wk if isinstance(wk, dict) else {}
 
-def is_voting_open_now(meta: dict, week_id: int) -> bool:
-    closes_at = get_week_voting_closes_at(meta, week_id)
+def get_week_opened_at_dt(meta: dict, week_id: int) -> Optional[datetime]:
+    wk = _get_week_block(meta, week_id)
+    s = wk.get("opened_at")
+    if not isinstance(s, str) or not s.strip():
+        return None
+    try:
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=MSK)
+        return dt.astimezone(MSK)
+    except Exception:
+        return None
+
+def get_week_voting_closes_dt_utc(meta: dict, week_id: int) -> datetime:
+    wk = _get_week_block(meta, week_id)
+    closes_at = wk.get("voting_closes_at")
+    if not isinstance(closes_at, str) or not closes_at.strip():
+        closes_at = next_saturday_18_msk_iso()
 
     try:
-        closes_dt = datetime.fromisoformat(closes_at.replace("Z", "+00:00"))
+        return datetime.fromisoformat(closes_at.replace("Z", "+00:00")).astimezone(timezone.utc)
     except Exception:
         # если руками сломали формат — не блокируем навсегда
-        return True
+        return datetime.now(timezone.utc) + timedelta(days=3650)
 
-    return datetime.now(timezone.utc) < closes_dt
+def assert_voting_open(meta: dict, week_id: int) -> None:
+    """
+    1) Голосование разрешено только если неделя "открыта" (есть opened_at).
+    2) И только до voting_closes_at (суббота 18:00 МСК -> в UTC).
+    """
+    opened_dt = get_week_opened_at_dt(meta, week_id)
+    if opened_dt is None:
+        raise HTTPException(status_code=403, detail="VOTING_NOT_OPENED_YET")
+
+    closes_dt_utc = get_week_voting_closes_dt_utc(meta, week_id)
+    if datetime.now(timezone.utc) >= closes_dt_utc:
+        raise HTTPException(status_code=403, detail="VOTING_CLOSED")
 
 def mark_week_opened(week_id: int) -> dict:
-    """
-    Вызываем, когда неделя обновлена/опубликована.
-    С этого момента голоса разрешены до ближайшей субботы 18:00 МСК.
-    """
     meta = load_week_meta()
     weeks = meta.get("weeks")
     if not isinstance(weeks, dict):
@@ -568,43 +591,6 @@ def mark_week_opened(week_id: int) -> dict:
     save_week_meta(meta)
     return meta
 
-def get_week_opened_at(week_id: int) -> Optional[str]:
-    # читаем строго тот формат, который пишет mark_week_opened(): meta["weeks"][<id>]["opened_at"]
-    meta = _read_week_meta()
-    weeks = meta.get("weeks", {})
-    wk_key = str(int(week_id))
-    wk = weeks.get(wk_key, {})
-    opened = wk.get("opened_at")
-    return opened if isinstance(opened, str) and opened.strip() else None
-
-def next_saturday_close_after(dt_msk: datetime) -> datetime:
-    """
-    Ближайшая суббота 18:00 МСК, которая НЕ раньше dt_msk.
-    """
-    base = dt_msk.astimezone(MSK)
-    days_ahead = (VOTING_CLOSE_WEEKDAY - base.weekday()) % 7
-    close_day = (base + timedelta(days=days_ahead)).replace(
-        hour=VOTING_CLOSE_HOUR,
-        minute=VOTING_CLOSE_MINUTE,
-        second=0,
-        microsecond=0,
-    )
-    # если уже позже закрытия в эту субботу — берём следующую субботу
-    if close_day <= base:
-        close_day = close_day + timedelta(days=7)
-    return close_day
-
-def assert_voting_open(week_id: int) -> None:
-    opened_at = get_week_opened_at(week_id)
-    if not opened_at:
-        # неделя ещё не "опубликована" обновлением чарта
-        raise HTTPException(status_code=403, detail="VOTING_NOT_OPENED_YET")
-
-    close_at = next_saturday_close_after(opened_at)
-    now = datetime.now(MSK)
-
-    if now >= close_at:
-        raise HTTPException(status_code=403, detail="VOTING_CLOSED")
 
 
 # =========================
@@ -735,24 +721,27 @@ def vote_week(
     body: VoteIn,
     x_telegram_init_data: Optional[str] = Header(default=None),
 ):
-    try:
+        try:
         ensure_week_exists(week_id)
 
         meta = load_week_meta()
+        assert_voting_open(meta, week_id)
 
-        # 1) сначала проверяем, что неделя вообще "открыта" (opened_at существует)
-        assert_voting_open(week_id)
+        # строго требуем Telegram initData
+        user_id = user_id_from_telegram_init_data(x_telegram_init_data)
 
-        # 2) затем проверяем, что мы еще НЕ дошли до субботы 18:00 МСК
-        if not is_voting_open_now(meta, week_id):
-            raise HTTPException(status_code=403, detail="VOTING_CLOSED")
+        song_ids = [int(x) for x in (body.song_ids or []) if int(x) > 0]
+        if not song_ids:
+            raise HTTPException(status_code=400, detail="song_ids is empty")
 
-        # лимит
+        # лимит (20)
         if len(song_ids) > VOTE_LIMIT_PER_USER:
             raise HTTPException(status_code=400, detail=f"Too many votes. Limit={VOTE_LIMIT_PER_USER}")
 
         # проверка существования песен
         items = SONGS_BY_WEEK.get(week_id, [])
+        if not isinstance(items, list):
+            items = []
         exists = {int(s.get("id")) for s in items if isinstance(s, dict) and s.get("id") is not None}
         for sid in song_ids:
             if sid not in exists:
@@ -770,7 +759,6 @@ def vote_week(
 
         USER_VOTES[week_id][user_id] = song_ids
 
-        # persist
         save_votes_to_file()
 
         return {"ok": True, "week_id": week_id, "user_id": user_id, "votes": len(song_ids)}
@@ -781,6 +769,7 @@ def vote_week(
         print("❌ VOTE CRASH", flush=True)
         print(traceback.format_exc(), flush=True)
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.post("/admin/weeks/current/songs/enrich")
 def admin_enrich_current_week(
