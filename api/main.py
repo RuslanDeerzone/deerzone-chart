@@ -352,10 +352,10 @@ def _telegram_check_hash(init_data: str, bot_token: str) -> tuple[bool, str | No
     check_pairs.sort(key=lambda kv: kv[0])
     data_check_string = "\n".join([f"{k}={v}" for k, v in check_pairs])
 
-    secret_key = hashlib.sha256(bot_token.encode("utf-8")).digest()
+    secret_key = hmac.new(b"WebAppData", bot_token.encode("utf-8"), hashlib.sha256).digest()
     calc_hash = hmac.new(secret_key, data_check_string.encode("utf-8"), hashlib.sha256).hexdigest()
 
-    if calc_hash != received_hash:
+    if not hmac.compare_digest(calc_hash, (received_hash or "").lower()):
         return False, "HASH_MISMATCH", {"keys": sorted(list(data.keys()))}
 
     return True, None, data
