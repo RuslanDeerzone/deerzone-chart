@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Literal, Tuple
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
+from urllib.parse import parse_qsl
 
 import requests
 from fastapi import FastAPI, Body, Header, HTTPException
@@ -340,20 +341,14 @@ def _telegram_check_hash(init_data: str, bot_token: str) -> Tuple[bool, Optional
         return False, None
 
     try:
-        # parse querystring
-        pairs = init_data.split("&")
-        data: Dict[str, str] = {}
-        for p in pairs:
-            if "=" not in p:
-                continue
-            k, v = p.split("=", 1)
-            data[k] = v
+        # ✅ parse_qsl сам URL-декодит значения (это критично для корректного hash)
+        data: Dict[str, str] = dict(parse_qsl(init_data, keep_blank_values=True))
 
         recv_hash = data.get("hash", "")
         if not recv_hash:
             return False, None
 
-        # data_check_string: sorted key=value excluding hash
+        # data_check_string: sorted key=value excluding hash (по декодированным значениям)
         check_items = []
         for k in sorted(data.keys()):
             if k == "hash":
@@ -362,7 +357,11 @@ def _telegram_check_hash(init_data: str, bot_token: str) -> Tuple[bool, Optional
         data_check_string = "\n".join(check_items)
 
         secret_key = hashlib.sha256(bot_token.encode("utf-8")).digest()
-        calc_hash = hmac.new(secret_key, data_check_string.encode("utf-8"), hashlib.sha256).hexdigest()
+        calc_hash = hmac.new(
+            secret_key,
+            data_check_string.encode("utf-8"),
+            hashlib.sha256
+        ).hexdigest()
 
         ok = hmac.compare_digest(calc_hash, recv_hash)
 
@@ -371,7 +370,7 @@ def _telegram_check_hash(init_data: str, bot_token: str) -> Tuple[bool, Optional
         u = data.get("user")
         if u:
             try:
-                user_obj = json.loads(requests.utils.unquote(u))
+                user_obj = json.loads(u)  # ✅ уже декодировано
                 user_id = str(user_obj.get("id"))
             except Exception:
                 user_id = None
@@ -379,7 +378,6 @@ def _telegram_check_hash(init_data: str, bot_token: str) -> Tuple[bool, Optional
         return ok, user_id
     except Exception:
         return False, None
-
 
 def user_id_from_telegram_init_data(init_data: Optional[str]) -> str:
     if not init_data:
