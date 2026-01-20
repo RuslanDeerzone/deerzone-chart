@@ -26,7 +26,7 @@ from pydantic import BaseModel, Field
 # =========================
 # 2) CONFIG / CONSTANTS
 # =========================
-BASE_DIR = Path(__file__).resolve().parent  # api/
+BASE_DIR = Path("/data")
 SONGS_PATH = BASE_DIR / "songs.json"
 VOTES_PATH = BASE_DIR / "votes.json"
 WEEK_META_PATH = BASE_DIR / "week_meta.json"
