@@ -745,7 +745,7 @@ def vote_week(
 
         # 2) затем проверяем, что мы еще НЕ дошли до субботы 18:00 МСК
         if not is_voting_open_now(meta, week_id):
-        raise HTTPException(status_code=403, detail="VOTING_CLOSED")
+            raise HTTPException(status_code=403, detail="VOTING_CLOSED")
 
         # лимит
         if len(song_ids) > VOTE_LIMIT_PER_USER:
