@@ -568,20 +568,14 @@ def mark_week_opened(week_id: int) -> dict:
     save_week_meta(meta)
     return meta
 
-def get_week_opened_at(week_id: int) -> datetime | None:
+def get_week_opened_at(week_id: int) -> Optional[str]:
+    # читаем строго тот формат, который пишет mark_week_opened(): meta["weeks"][<id>]["opened_at"]
     meta = _read_week_meta()
-    wk = meta.get(str(int(week_id)), {})
-    s = wk.get("opened_at")
-    if not s:
-        return None
-    try:
-        # opened_at сохраняем в ISO, читаем как aware datetime
-        dt = datetime.fromisoformat(s)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=MSK)
-        return dt.astimezone(MSK)
-    except Exception:
-        return None
+    weeks = meta.get("weeks", {})
+    wk_key = str(int(week_id))
+    wk = weeks.get(wk_key, {})
+    opened = wk.get("opened_at")
+    return opened if isinstance(opened, str) and opened.strip() else None
 
 def next_saturday_close_after(dt_msk: datetime) -> datetime:
     """
@@ -745,14 +739,13 @@ def vote_week(
         ensure_week_exists(week_id)
 
         meta = load_week_meta()
+
+        # 1) сначала проверяем, что неделя вообще "открыта" (opened_at существует)
         assert_voting_open(week_id)
 
-        # строго требуем Telegram initData
-        user_id = user_id_from_telegram_init_data(x_telegram_init_data)
-
-        song_ids = [int(x) for x in (body.song_ids or []) if int(x) > 0]
-        if not song_ids:
-            raise HTTPException(status_code=400, detail="song_ids is empty")
+        # 2) затем проверяем, что мы еще НЕ дошли до субботы 18:00 МСК
+        if not is_voting_open_now(meta, week_id):
+        raise HTTPException(status_code=403, detail="VOTING_CLOSED")
 
         # лимит
         if len(song_ids) > VOTE_LIMIT_PER_USER:
