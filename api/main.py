@@ -26,7 +26,7 @@ from pydantic import BaseModel, Field
 # =========================
 # 2) CONFIG / CONSTANTS
 # =========================
-BASE_DIR = Path(__file__).resolve().parent  # api/
+BASE_DIR = Path("/data")
 SONGS_PATH = BASE_DIR / "songs.json"
 VOTES_PATH = BASE_DIR / "votes.json"
 WEEK_META_PATH = BASE_DIR / "week_meta.json"
@@ -239,68 +239,78 @@ def save_songs_to_file(items: List[dict]) -> None:
 
 def load_votes_from_file() -> Tuple[Dict[int, Dict[int, int]], Dict[int, Dict[str, List[int]]]]:
     """
-    votes.json формат:
-    {
-      "3": {
-        "votes": { "16": 5, "8": 2 },
-        "user_votes": { "12345": [16,8] }
-      }
-    }
+    Читает votes.json и возвращает (VOTES, USER_VOTES).
+    Поддерживает:
+    - новый формат: { "3": {"votes": {...}, "user_votes": {...}}, ... }
+    - старый формат (если вдруг был): { "3": {...} }
     """
     if not VOTES_PATH.exists():
         print(f"[BOOT] votes.json NOT FOUND: {VOTES_PATH}", flush=True)
         return {}, {}
 
     try:
-        data = _read_json_bom_safe(VOTES_PATH)
+        raw = VOTES_PATH.read_text(encoding="utf-8-sig")
+        data = json.loads(raw) if raw.strip() else {}
         if not isinstance(data, dict):
-            print(f"[BOOT] votes.json is not dict: {type(data)}", flush=True)
+            print(f"[BOOT] votes.json is not dict, got {type(data)}", flush=True)
             return {}, {}
 
         votes_out: Dict[int, Dict[int, int]] = {}
-        users_out: Dict[int, Dict[str, List[int]]] = {}
+        user_out: Dict[int, Dict[str, List[int]]] = {}
 
-        for wk_str, block in data.items():
+        for wk_str, payload in data.items():
             try:
                 wk = int(wk_str)
             except Exception:
                 continue
-            if not isinstance(block, dict):
+
+            # ---- НОВЫЙ ФОРМАТ ----
+            if isinstance(payload, dict) and ("votes" in payload or "user_votes" in payload):
+                v = payload.get("votes", {})
+                u = payload.get("user_votes", {})
+
+                vmap: Dict[int, int] = {}
+                if isinstance(v, dict):
+                    for sid_str, cnt in v.items():
+                        try:
+                            vmap[int(sid_str)] = int(cnt)
+                        except Exception:
+                            continue
+
+                umap: Dict[str, List[int]] = {}
+                if isinstance(u, dict):
+                    for uid, arr in u.items():
+                        if not isinstance(arr, list):
+                            continue
+                        out_ids: List[int] = []
+                        for x in arr:
+                            try:
+                                out_ids.append(int(x))
+                            except Exception:
+                                continue
+                        umap[str(uid)] = out_ids
+
+                votes_out[wk] = vmap
+                user_out[wk] = umap
                 continue
 
-            vmap = block.get("votes", {})
-            umap = block.get("user_votes", {})
-
-            vv: Dict[int, int] = {}
-            if isinstance(vmap, dict):
-                for sid_str, cnt in vmap.items():
+            # ---- СТАРЫЙ ФОРМАТ (на всякий) ----
+            if isinstance(payload, dict):
+                # если вдруг там лежит просто мапа песня->голоса
+                vmap: Dict[int, int] = {}
+                for sid_str, cnt in payload.items():
                     try:
-                        sid = int(sid_str)
-                        vv[sid] = int(cnt)
+                        vmap[int(sid_str)] = int(cnt)
                     except Exception:
                         continue
-
-            uu: Dict[str, List[int]] = {}
-            if isinstance(umap, dict):
-                for uid, ids in umap.items():
-                    if not isinstance(uid, str):
-                        uid = str(uid)
-                    if isinstance(ids, list):
-                        clean: List[int] = []
-                        for i in ids:
-                            try:
-                                clean.append(int(i))
-                            except Exception:
-                                pass
-                        uu[uid] = clean
-
-            votes_out[wk] = vv
-            users_out[wk] = uu
+                votes_out[wk] = vmap
+                user_out.setdefault(wk, {})
 
         print(f"[BOOT] votes.json loaded: weeks={len(votes_out)}", flush=True)
-        return votes_out, users_out
+        return votes_out, user_out
+
     except Exception as e:
-        print(f"[BOOT] votes.json FAILED: {e}", flush=True)
+        print(f"[BOOT] votes.json FAILED to load: {e}", flush=True)
         return {}, {}
 
 
