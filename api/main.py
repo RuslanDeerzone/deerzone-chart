@@ -332,67 +332,76 @@ def get_current_week() -> dict:
     return {"id": CURRENT_WEEK_ID}
 
 
-def _telegram_check_hash(init_data: str, bot_token: str) -> Tuple[bool, Optional[str]]:
+def _telegram_check_hash(init_data: str, bot_token: str) -> tuple[bool, str | None, dict]:
     """
-    Telegram WebApp initData validation:
-    https://core.telegram.org/bots/webapps#validating-data-received-via-the-web-app
+    Проверка initData согласно Telegram WebApp:
+    - data_check_string: key=value (кроме hash), отсортировано по key, join '\n'
+    - secret_key = sha256(bot_token)
+    - HMAC_SHA256(secret_key, data_check_string) == hash
+    Возвращает: (ok, error, parsed)
     """
-    if not init_data or not bot_token:
-        return False, None
+    if not init_data or not isinstance(init_data, str):
+        return False, "EMPTY_INIT_DATA", {}
+
+    if not bot_token:
+        return False, "TELEGRAM_BOT_TOKEN_EMPTY", {}
+
+    # ВАЖНО: initData приходит как "a=..&b=..&hash=.."
+    # parse_qsl сам корректно распарсит и URL-decoding сделает 1 раз.
+    try:
+        pairs = parse_qsl(init_data, keep_blank_values=True)
+    except Exception:
+        return False, "BAD_INIT_DATA_FORMAT", {}
+
+    data = dict(pairs)
+    received_hash = data.get("hash")
+    if not received_hash:
+        return False, "NO_HASH", data
+
+    # Telegram требует исключить hash и отсортировать по ключам
+    check_pairs = [(k, v) for (k, v) in data.items() if k != "hash"]
+    check_pairs.sort(key=lambda kv: kv[0])
+    data_check_string = "\n".join([f"{k}={v}" for k, v in check_pairs])
+
+    secret_key = hashlib.sha256(bot_token.encode("utf-8")).digest()
+    calc_hash = hmac.new(secret_key, data_check_string.encode("utf-8"), hashlib.sha256).hexdigest()
+
+    if calc_hash != received_hash:
+        return False, "HASH_MISMATCH", data
+
+    return True, None, data
+
+
+def user_id_from_telegram_init_data(init_data: str | None) -> str:
+    ok, err, data = _telegram_check_hash(init_data or "", TELEGRAM_BOT_TOKEN)
+    if not ok:
+        raise HTTPException(status_code=401, detail=f"TELEGRAM_AUTH_FAILED:{err}")
+
+    # необязательно, но полезно: ограничение по времени (например 24 часа)
+    auth_date = data.get("auth_date")
+    try:
+        auth_ts = int(auth_date) if auth_date else 0
+    except Exception:
+        auth_ts = 0
+
+    if auth_ts:
+        now_ts = int(datetime.now(timezone.utc).timestamp())
+        if now_ts - auth_ts > 24 * 3600:
+            raise HTTPException(status_code=401, detail="TELEGRAM_AUTH_EXPIRED")
+
+    # user лежит JSON-строкой
+    user_raw = data.get("user")
+    if not user_raw:
+        raise HTTPException(status_code=401, detail="TELEGRAM_NO_USER")
 
     try:
-        # ✅ parse_qsl сам URL-декодит значения (это критично для корректного hash)
-        data: Dict[str, str] = dict(parse_qsl(init_data, keep_blank_values=True))
-
-        recv_hash = data.get("hash", "")
-        if not recv_hash:
-            return False, None
-
-        # data_check_string: sorted key=value excluding hash (по декодированным значениям)
-        check_items = []
-        for k in sorted(data.keys()):
-            if k == "hash":
-                continue
-            check_items.append(f"{k}={data[k]}")
-        data_check_string = "\n".join(check_items)
-
-        secret_key = hashlib.sha256(bot_token.encode("utf-8")).digest()
-        calc_hash = hmac.new(
-            secret_key,
-            data_check_string.encode("utf-8"),
-            hashlib.sha256
-        ).hexdigest()
-
-        ok = hmac.compare_digest(calc_hash, recv_hash)
-
-        # user id (если есть user=JSON)
-        user_id = None
-        u = data.get("user")
-        if u:
-            try:
-                user_obj = json.loads(u)  # ✅ уже декодировано
-                user_id = str(user_obj.get("id"))
-            except Exception:
-                user_id = None
-
-        return ok, user_id
+        u = json.loads(user_raw)
+        uid = u.get("id")
+        if not uid:
+            raise ValueError("no id")
+        return str(uid)
     except Exception:
-        return False, None
-
-def user_id_from_telegram_init_data(init_data: Optional[str]) -> str:
-    if not init_data:
-        raise HTTPException(status_code=401, detail="Missing X-Telegram-Init-Data")
-
-    # если токен не задан — НЕ делаем вид, что всё ок
-    if not TELEGRAM_BOT_TOKEN:
-        raise HTTPException(status_code=500, detail="TELEGRAM_BOT_TOKEN is not configured")
-
-    ok, user_id = _telegram_check_hash(init_data, TELEGRAM_BOT_TOKEN)
-    if not ok:
-        raise HTTPException(status_code=401, detail="Invalid Telegram initData signature")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Cannot read user id from initData")
-    return user_id
+        raise HTTPException(status_code=401, detail="TELEGRAM_BAD_USER_JSON")
 
 
 def _norm(s: Any) -> str:
