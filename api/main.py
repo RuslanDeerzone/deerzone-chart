@@ -30,14 +30,15 @@ class SongsReplaceIn(BaseModel):
 # =========================
 # 2) CONFIG / CONSTANTS
 # =========================
-BASE_DIR = Path(__file__).resolve().parent  # /app/api
 
+APP_DIR = Path(__file__).resolve().parent  # /app/api
 DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
 
-SONGS_PATH = BASE_DIR / "songs.json"          # песни из репо
-VOTES_PATH = DATA_DIR / "votes.json"          # голоса в volume
-WEEK_META_PATH = DATA_DIR / "week_meta.json"  # окно голосования в volume
+SONGS_PATH = DATA_DIR / "songs.json"
+VOTES_PATH = DATA_DIR / "votes.json"
+WEEK_META_PATH = DATA_DIR / "week_meta.json"
 
+SEED_SONGS_PATH = APP_DIR / "songs.json"  # <-- seed лежит рядом с main.py
 
 def _ensure_data_dir() -> None:
     try:
@@ -48,18 +49,15 @@ def _ensure_data_dir() -> None:
 
 def _seed_file_if_missing(dst: Path, src: Path) -> None:
     """
-    Копируем seed-файл из репозитория в /data ТОЛЬКО если dst отсутствует.
-    Ничего не затираем, если dst уже существует.
+    Если dst отсутствует, но src существует — копируем.
+    НИЧЕГО не трогаем, если dst уже есть (чтобы не затирать volume).
     """
     try:
         if dst.exists():
-            print(f"[BOOT] SEED skip (exists): {dst}", flush=True)
             return
-
         if not src.exists():
             print(f"[BOOT] SEED source missing: {src}", flush=True)
             return
-
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(src, dst)
         print(f"[BOOT] SEEDED {dst} <- {src}", flush=True)
@@ -654,17 +652,18 @@ def startup_event():
 
     _ensure_data_dir()
 
+    # seed songs.json в volume, если его там нет
+    _seed_file_if_missing(SONGS_PATH, SEED_SONGS_PATH)
+
     meta = load_week_meta()
     try:
         CURRENT_WEEK_ID = int(meta.get("current_week_id") or CURRENT_WEEK_ID)
     except Exception:
         pass
 
-    # --- songs ---
     items = load_songs_from_file()
     SONGS_BY_WEEK[CURRENT_WEEK_ID] = items if isinstance(items, list) else []
 
-    # --- votes ---
     votes_loaded, users_loaded = load_votes_from_file()
     VOTES.clear()
     USER_VOTES.clear()
