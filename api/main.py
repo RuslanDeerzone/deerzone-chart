@@ -22,6 +22,9 @@ from fastapi import FastAPI, Body, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+class SongsReplaceIn(BaseModel):
+    items: List[dict]
+
 
 # =========================
 # 2) CONFIG / CONSTANTS
@@ -847,32 +850,26 @@ def admin_enrich_current_week(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-class SongsReplaceIn(BaseModel):
-    items: List[dict]
-
-@app.post("/admin/weeks/{week_id}/songs/replace"]
+@app.post("/admin/weeks/{week_id}/songs/replace")
 def admin_replace_songs(
     week_id: int,
     body: SongsReplaceIn,
     x_admin_token: Optional[str] = Header(default=None),
 ):
     require_admin(x_admin_token)
-    ensure_week_exists(week_id)
 
-    items = body.items
-    if not isinstance(items, list):
+    if not isinstance(body.items, list):
         raise HTTPException(status_code=400, detail="BAD_ITEMS")
 
-    # нормализация (если функция у тебя существует — отлично)
-    try:
-        items = normalize_songs(items)
-    except Exception:
-        pass
-
+    items = body.items
     SONGS_BY_WEEK[week_id] = items
     save_songs_to_file(items)
 
+    # если хочешь автоматически "открывать" неделю после замены списка:
+    # mark_week_opened(week_id)
+
     return {"ok": True, "week_id": week_id, "count": len(items)}
+
 
 @app.get("/admin/weeks/{week_id}/votes/summary")
 def admin_votes_summary(
