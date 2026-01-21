@@ -5,13 +5,13 @@ from __future__ import annotations
 # 1) IMPORTS
 # =========================
 import os
+import shutil
 import re
 import json
 import hmac
 import time
 import hashlib
 import traceback
-import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Literal, Tuple
 from datetime import datetime, timedelta, timezone
@@ -33,9 +33,9 @@ class SongsReplaceIn(BaseModel):
 
 DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
 
-# repo root: /app (если main.py лежит в /app/api/main.py)
+# main.py лежит в /app/api/main.py => repo root это /app
 REPO_ROOT = Path(__file__).resolve().parent.parent
-SEED_DATA_DIR = REPO_ROOT / "data"  # тут лежит songs.json в репозитории
+SEED_DATA_DIR = REPO_ROOT / "data"   # в репо: /data/songs.json
 
 SONGS_PATH = DATA_DIR / "songs.json"
 VOTES_PATH = DATA_DIR / "votes.json"
@@ -51,15 +51,18 @@ def _ensure_data_dir() -> None:
 
 def _seed_file_if_missing(dst: Path, src: Path) -> None:
     """
-    Если dst отсутствует, но src существует — копируем.
-    НИЧЕГО не трогаем, если dst уже есть (чтобы не затирать данные в volume).
+    Копируем seed-файл из репозитория в /data ТОЛЬКО если dst отсутствует.
+    Ничего не затираем, если dst уже существует.
     """
     try:
         if dst.exists():
+            print(f"[BOOT] SEED skip (exists): {dst}", flush=True)
             return
+
         if not src.exists():
             print(f"[BOOT] SEED source missing: {src}", flush=True)
             return
+
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(src, dst)
         print(f"[BOOT] SEEDED {dst} <- {src}", flush=True)
@@ -651,13 +654,12 @@ app.add_middleware(
 @app.on_event("startup")
 def startup_event():
     global CURRENT_WEEK_ID
+
     _ensure_data_dir()
     _seed_file_if_missing(SONGS_PATH, SEED_DATA_DIR / "songs.json")
     _seed_file_if_missing(WEEK_META_PATH, SEED_DATA_DIR / "week_meta.json")
-    # votes.json специально НЕ сидим из репо (обычно его нет), просто дадим ему создаться при первом голосе
 
     meta = load_week_meta()
-    # если в meta нет current_week_id — оставляем env как есть
     try:
         CURRENT_WEEK_ID = int(meta.get("current_week_id") or CURRENT_WEEK_ID)
     except Exception:
