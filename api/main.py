@@ -104,10 +104,10 @@ def _read_json_bom_safe(path: Path) -> Any:
 def normalize_songs(items: Any) -> List[dict]:
     """
     Нормализует массив песен:
-    - гарантирует dict
-    - гарантирует поля: id, artist, title, is_new, weeks_in_chart, source, cover, preview_url, lock_media
-    - вычисляет is_current (для вкладки Current) если его нет:
-      source == "carryover" -> is_current=True
+    - пропускает всё, что не dict
+    - id обязателен и > 0
+    - не допускает дубли id (оставляет первый)
+    - аккуратно заполняет поля по умолчанию
     """
     if not isinstance(items, list):
         return []
@@ -126,7 +126,6 @@ def normalize_songs(items: Any) -> List[dict]:
         if sid <= 0:
             continue
 
-        # дубль id — оставляем первый
         if sid in seen_ids:
             continue
         seen_ids.add(sid)
@@ -169,8 +168,6 @@ def normalize_songs(items: Any) -> List[dict]:
             "lock_media": lock_media,
         })
 
-    # финальная страховка: только dict
-    out = [x for x in out if isinstance(x, dict)]
     return out
 
 
@@ -229,14 +226,8 @@ def load_songs_from_file() -> List[dict]:
     print(f"[BOOT] songs.json loaded OK: {len(norm_list)} items", flush=True)
     return norm_list
 
-    # 🛡️ предохранитель: если нормализация "обнулила" непустой список — возвращаем сырой список
-    if isinstance(data, list) and len(data) == 0 and isinstance(raw_data, list) and len(raw_data) > 0:
-        print("[BOOT] normalize_songs wiped songs -> fallback to raw list", flush=True)
-        data = raw_data
-
 
 def save_songs_to_file(items: List[dict]) -> None:
-    # сохраняем уже нормализованный список
     _atomic_write_json(SONGS_PATH, normalize_songs(items))
 
 
