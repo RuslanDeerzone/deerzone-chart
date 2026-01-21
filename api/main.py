@@ -30,6 +30,7 @@ class SongsReplaceIn(BaseModel):
 # 2) CONFIG / CONSTANTS
 # =========================
 BASE_DIR = Path("/data")
+BASE_DIR.mkdir(parents=True, exist_ok=True)
 SONGS_PATH = BASE_DIR / "songs.json"
 VOTES_PATH = BASE_DIR / "votes.json"
 WEEK_META_PATH = BASE_DIR / "week_meta.json"
