@@ -235,7 +235,19 @@ def load_songs_from_file() -> List[dict]:
 
 
 def save_songs_to_file(items: List[dict]) -> None:
-    _atomic_write_json(SONGS_PATH, normalize_songs(items))
+    # нормализуем
+    norm = normalize_songs(items)
+
+    # 🛡️ если нормализация неожиданно "обнулила" непустой список — НЕ ПИШЕМ []
+    # сохраняем хотя бы сырые dict-объекты, чтобы не потерять файл
+    if len(norm) == 0:
+        raw_list = [x for x in (items or []) if isinstance(x, dict)]
+        if len(raw_list) > 0:
+            print("[WARN] normalize_songs returned 0 -> writing raw_list to avoid wiping songs.json", flush=True)
+            _atomic_write_json(SONGS_PATH, raw_list)
+            return
+
+    _atomic_write_json(SONGS_PATH, norm)
 
 
 def load_votes_from_file() -> Tuple[Dict[int, Dict[int, int]], Dict[int, Dict[str, List[int]]]]:
@@ -865,19 +877,23 @@ def admin_replace_songs(
     body: SongsReplaceIn,
     x_admin_token: Optional[str] = Header(default=None),
 ):
+
     require_admin(x_admin_token)
+    ensure_week_exists(week_id)
 
     if not isinstance(body.items, list):
         raise HTTPException(status_code=400, detail="BAD_ITEMS")
 
-    items = body.items
-    SONGS_BY_WEEK[week_id] = items
-    save_songs_to_file(items)
+    norm = normalize_songs(body.items)
 
-    # если хочешь автоматически "открывать" неделю после замены списка:
-    # mark_week_opened(week_id)
+    # 🛡️ если прислали непусто, но после нормализации стало пусто — значит payload битый
+    if len(norm) == 0 and len(body.items) > 0:
+        raise HTTPException(status_code=400, detail="BAD_ITEMS_NORMALIZE_WIPED")
 
-    return {"ok": True, "week_id": week_id, "count": len(items)}
+    SONGS_BY_WEEK[week_id] = norm
+    save_songs_to_file(norm)
+
+    return {"ok": True, "week_id": week_id, "count": len(norm)}
 
 
 @app.get("/admin/weeks/{week_id}/votes/summary")
