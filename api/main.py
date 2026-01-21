@@ -11,6 +11,7 @@ import hmac
 import time
 import hashlib
 import traceback
+import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Literal, Tuple
 from datetime import datetime, timedelta, timezone
@@ -29,11 +30,41 @@ class SongsReplaceIn(BaseModel):
 # =========================
 # 2) CONFIG / CONSTANTS
 # =========================
-BASE_DIR = Path("/data")
-BASE_DIR.mkdir(parents=True, exist_ok=True)
-SONGS_PATH = BASE_DIR / "songs.json"
-VOTES_PATH = BASE_DIR / "votes.json"
-WEEK_META_PATH = BASE_DIR / "week_meta.json"
+
+DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
+
+# repo root: /app (если main.py лежит в /app/api/main.py)
+REPO_ROOT = Path(__file__).resolve().parent.parent
+SEED_DATA_DIR = REPO_ROOT / "data"  # тут лежит songs.json в репозитории
+
+SONGS_PATH = DATA_DIR / "songs.json"
+VOTES_PATH = DATA_DIR / "votes.json"
+WEEK_META_PATH = DATA_DIR / "week_meta.json"
+
+
+def _ensure_data_dir() -> None:
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        print(f"[BOOT] DATA_DIR mkdir failed: {DATA_DIR} -> {e}", flush=True)
+
+
+def _seed_file_if_missing(dst: Path, src: Path) -> None:
+    """
+    Если dst отсутствует, но src существует — копируем.
+    НИЧЕГО не трогаем, если dst уже есть (чтобы не затирать данные в volume).
+    """
+    try:
+        if dst.exists():
+            return
+        if not src.exists():
+            print(f"[BOOT] SEED source missing: {src}", flush=True)
+            return
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, dst)
+        print(f"[BOOT] SEEDED {dst} <- {src}", flush=True)
+    except Exception as e:
+        print(f"[BOOT] SEED failed {dst} <- {src}: {e}", flush=True)
 
 CURRENT_WEEK_ID = int(os.getenv("CURRENT_WEEK_ID", "3"))
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
@@ -620,6 +651,10 @@ app.add_middleware(
 @app.on_event("startup")
 def startup_event():
     global CURRENT_WEEK_ID
+    _ensure_data_dir()
+    _seed_file_if_missing(SONGS_PATH, SEED_DATA_DIR / "songs.json")
+    _seed_file_if_missing(WEEK_META_PATH, SEED_DATA_DIR / "week_meta.json")
+    # votes.json специально НЕ сидим из репо (обычно его нет), просто дадим ему создаться при первом голосе
 
     meta = load_week_meta()
     # если в meta нет current_week_id — оставляем env как есть
