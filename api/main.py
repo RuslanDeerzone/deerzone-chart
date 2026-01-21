@@ -30,16 +30,13 @@ class SongsReplaceIn(BaseModel):
 # =========================
 # 2) CONFIG / CONSTANTS
 # =========================
+BASE_DIR = Path(__file__).resolve().parent  # /app/api
 
 DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
 
-# main.py лежит в /app/api/main.py => repo root это /app
-REPO_ROOT = Path(__file__).resolve().parent.parent
-SEED_DATA_DIR = REPO_ROOT / "data"   # в репо: /data/songs.json
-
-SONGS_PATH = DATA_DIR / "songs.json"
-VOTES_PATH = DATA_DIR / "votes.json"
-WEEK_META_PATH = DATA_DIR / "week_meta.json"
+SONGS_PATH = BASE_DIR / "songs.json"          # песни из репо
+VOTES_PATH = DATA_DIR / "votes.json"          # голоса в volume
+WEEK_META_PATH = DATA_DIR / "week_meta.json"  # окно голосования в volume
 
 
 def _ensure_data_dir() -> None:
