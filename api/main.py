@@ -767,6 +767,17 @@ def vote_week(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/admin/weeks/current/voting/open")
+def admin_open_voting_current_week(
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    require_admin(x_admin_token)
+
+    week_id = CURRENT_WEEK_ID
+    meta = mark_week_opened(week_id)  # ДОЛЖНО записать в WEEK_META_PATH (то есть /data/week_meta.json)
+    return {"ok": True, "week_id": week_id, "meta": meta}
+
+
 @app.post("/admin/weeks/current/songs/enrich")
 def admin_enrich_current_week(
     force: bool = Body(default=False),
