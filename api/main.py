@@ -215,16 +215,23 @@ def load_songs_from_file() -> List[dict]:
         print(f"[BOOT] songs.json INVALID ROOT TYPE: {type(data)} (expected list)", flush=True)
         return []
 
-    raw_list = [x for x in data if isinstance(x, dict)]
-    norm_list = normalize_songs(raw_list)
+    # приводим к списку dict
+    raw_data = data
+    data = [x for x in data if isinstance(x, dict)] if isinstance(data, list) else []
 
-    # если нормализация вдруг вернула 0, но данные были — не теряем
-    if len(norm_list) == 0 and len(raw_list) > 0:
-        print("[BOOT] normalize_songs returned 0 from non-empty input -> fallback to raw", flush=True)
-        return raw_list
+    try:
+        data = normalize_songs(data)
+    except Exception as e:
+        print(f"[BOOT] normalize_songs FAILED: {e}", flush=True)
+        data = [x for x in raw_data if isinstance(x, dict)] if isinstance(raw_data, list) else []
 
-    print(f"[BOOT] songs.json loaded OK: {len(norm_list)} items", flush=True)
-    return norm_list
+    # 🛡️ предохранитель: если нормализация "обнулила" непустой список — возвращаем сырой список
+    if isinstance(data, list) and len(data) == 0 and isinstance(raw_data, list) and len(raw_data) > 0:
+        print("[BOOT] normalize_songs wiped songs -> fallback to raw list", flush=True)
+        data = [x for x in raw_data if isinstance(x, dict)]
+
+    print(f"[BOOT] songs.json loaded OK: {len(data)} items", flush=True)
+    return data
 
 
 def save_songs_to_file(items: List[dict]) -> None:
