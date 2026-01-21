@@ -653,8 +653,6 @@ def startup_event():
     global CURRENT_WEEK_ID
 
     _ensure_data_dir()
-    _seed_file_if_missing(SONGS_PATH, SEED_DATA_DIR / "songs.json")
-    _seed_file_if_missing(WEEK_META_PATH, SEED_DATA_DIR / "week_meta.json")
 
     meta = load_week_meta()
     try:
