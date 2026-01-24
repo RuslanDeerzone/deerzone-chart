@@ -23,6 +23,20 @@ from fastapi import FastAPI, Body, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+
+def _pick_persistent_path(primary, fallback):
+    """
+    Берём primary (обычно /data/...), если файл/директория доступны.
+    Иначе используем fallback (например, /app/api/...), чтобы не падать.
+    """
+    try:
+        p = Path(primary)
+        # если это файл — проверим, что родитель существует/можно создать
+        p.parent.mkdir(parents=True, exist_ok=True)
+        return p
+    except Exception:
+        return Path(fallback)
+
 class SongsReplaceIn(BaseModel):
     items: List[dict]
 
@@ -141,10 +155,6 @@ def _path_is_writable(p: Path) -> bool:
     except Exception:
         return False
 
-
-def _pick_persistent_path(primary: Path, fallback: Path) -> Path:
-    # если /data недоступен — пишем в api, но приложение не падает
-    return primary if _path_is_writable(primary) else fallback
 
 def _read_json_bom_safe(path: Path) -> Any:
     """
