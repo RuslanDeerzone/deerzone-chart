@@ -584,6 +584,28 @@ def load_week_meta() -> dict:
 def save_week_meta(meta: dict) -> None:
     _atomic_write_json(WEEK_META_PATH, meta)
 
+def get_next_song_id(meta: dict) -> int:
+    try:
+        return int(meta.get("next_song_id") or 1)
+    except Exception:
+        return 1
+
+def set_next_song_id(meta: dict, next_id: int) -> None:
+    meta["next_song_id"] = int(next_id)
+
+def ensure_next_song_id(meta: dict, items: list[dict]) -> dict:
+    if meta.get("next_song_id"):
+        return meta
+    mx = 0
+    for s in items:
+        try:
+            mx = max(mx, int(s.get("id") or 0))
+        except Exception:
+            pass
+    meta["next_song_id"] = mx + 1
+    save_week_meta(meta)
+    return meta
+
 def next_saturday_18_msk_iso(now_utc: Optional[datetime] = None) -> str:
     if now_utc is None:
         now_utc = datetime.now(timezone.utc)
@@ -740,6 +762,18 @@ class SongOut(BaseModel):
 
 class VoteIn(BaseModel):
     song_ids: List[int] = Field(default_factory=list)
+
+
+class NewTrackIn(BaseModel):
+    artist: str
+    title: str
+    source: Optional[str] = "new"
+    lock_media: Optional[bool] = False  # если трек ещё не в iTunes — ставим True
+
+class RolloverIn(BaseModel):
+    new_tracks: List[NewTrackIn]
+    top_n: int = 20
+    max_weeks_in_chart: int = 10
 
 
 # =========================
@@ -1049,6 +1083,120 @@ def admin_replace_songs(
     save_songs_to_file(norm)
 
     return {"ok": True, "week_id": week_id, "count": len(norm)}
+
+
+@app.post("/admin/weeks/{week_id}/rollover")
+def admin_rollover_week(
+    week_id: int,
+    body: RolloverIn,
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    require_admin(x_admin_token)
+    ensure_week_exists(week_id)
+
+    prev_week_id = week_id - 1
+    if prev_week_id <= 0:
+        raise HTTPException(status_code=400, detail="NO_PREVIOUS_WEEK")
+
+    # прошлые песни и голоса
+    prev_items = SONGS_BY_WEEK.get(prev_week_id, [])
+    if not isinstance(prev_items, list):
+        prev_items = []
+
+    prev_votes = VOTES.get(prev_week_id, {})
+    if not isinstance(prev_votes, dict):
+        prev_votes = {}
+
+    # сортируем песни прошлой недели по голосам (desc)
+    def votes_of(song: dict) -> int:
+        try:
+            sid = int(song.get("id") or 0)
+            return int(prev_votes.get(sid, 0))
+        except Exception:
+            return 0
+
+    # только dict
+    prev_items = [s for s in prev_items if isinstance(s, dict) and s.get("id") is not None]
+
+    prev_items_sorted = sorted(
+        prev_items,
+        key=lambda s: (-votes_of(s), str(s.get("artist") or "").lower(), str(s.get("title") or "").lower())
+    )
+
+    top_n = max(0, int(body.top_n or 20))
+    max_weeks = max(1, int(body.max_weeks_in_chart or 10))
+
+    carried: list[dict] = []
+    for s in prev_items_sorted[:top_n]:
+        # если трек уже 10 недель — вылетает
+        w = int(s.get("weeks_in_chart") or 1)
+        if w >= max_weeks:
+            continue
+
+        ns = dict(s)  # копия
+        ns["is_new"] = False
+        ns["source"] = "current"
+        ns["weeks_in_chart"] = w + 1
+        carried.append(ns)
+
+    # meta: current_week_id + next_song_id
+    meta = load_week_meta()
+    meta = ensure_next_song_id(meta, prev_items)
+
+    next_id = get_next_song_id(meta)
+
+    # добавляем новинки
+    new_items: list[dict] = []
+    for t in (body.new_tracks or []):
+        artist = str(t.artist or "").strip()
+        title = str(t.title or "").strip()
+        if not artist or not title:
+            continue
+
+        new_items.append({
+            "id": next_id,
+            "artist": artist,
+            "title": title,
+            "is_new": True,
+            "weeks_in_chart": 1,
+            "cover": None,
+            "preview_url": None,
+            "source": t.source or "new",
+            "lock_media": bool(t.lock_media or False),
+        })
+        next_id += 1
+
+    # итоговый состав недели
+    items = carried + new_items
+
+    # применяем
+    SONGS_BY_WEEK[week_id] = items
+    save_songs_to_file(items)
+
+    # подготовим структуры голосов на новую неделю
+    VOTES.setdefault(week_id, {})
+    USER_VOTES.setdefault(week_id, {})
+
+    # обновим meta: текущая неделя + следующий id
+    meta["current_week_id"] = int(week_id)
+    set_next_song_id(meta, next_id)
+    save_week_meta(meta)
+
+    # открываем голосование (ты уже это делал ранее через mark_week_opened)
+    try:
+        mark_week_opened(week_id)
+    except Exception:
+        pass
+
+    return {
+        "ok": True,
+        "week_id": week_id,
+        "prev_week_id": prev_week_id,
+        "carried": len(carried),
+        "new_added": len(new_items),
+        "total": len(items),
+        "next_song_id": next_id,
+    }
 
 
 @app.get("/admin/weeks/{week_id}/votes/summary")
