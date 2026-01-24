@@ -31,14 +31,20 @@ class SongsReplaceIn(BaseModel):
 # 2) CONFIG / CONSTANTS
 # =========================
 
-APP_DIR = Path(__file__).resolve().parent  # /app/api
-DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
+BASE_DIR = Path(__file__).resolve().parent  # /app/api
 
-SONGS_PATH = DATA_DIR / "songs.json"
+# songs.json ОСТАЁТСЯ В API — НЕ В VOLUME
+SONGS_PATH = BASE_DIR / "songs.json"
+
+# всё, что должно переживать деплой — в volume (/data)
+DATA_DIR = Path(os.getenv("DATA_DIR", "/data"))
 VOTES_PATH = DATA_DIR / "votes.json"
 WEEK_META_PATH = DATA_DIR / "week_meta.json"
+ARCHIVE_DIR = DATA_DIR / "archive"
 
-SEED_SONGS_PATH = APP_DIR / "songs.json"  # <-- seed лежит рядом с main.py
+VOTES_PATH = _pick_persistent_path(VOTES_PATH, BASE_DIR / "votes.json")
+WEEK_META_PATH = _pick_persistent_path(WEEK_META_PATH, BASE_DIR / "week_meta.json")
+ARCHIVE_DIR = (_pick_persistent_path(ARCHIVE_DIR / ".keep", BASE_DIR / "archive" / ".keep")).parent
 
 def _ensure_data_dir() -> None:
     try:
@@ -118,6 +124,27 @@ def _atomic_write_json(path: Path, obj) -> None:
     # атомарная замена
     tmp_path.replace(path)
 
+
+def _ensure_dir(p: Path) -> None:
+    try:
+        p.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        print(f"[BOOT] cannot mkdir {p}: {e}", flush=True)
+
+def _path_is_writable(p: Path) -> bool:
+    try:
+        _ensure_dir(p.parent)
+        test = p.parent / ".write_test"
+        test.write_text("ok", encoding="utf-8")
+        test.unlink(missing_ok=True)
+        return True
+    except Exception:
+        return False
+
+
+def _pick_persistent_path(primary: Path, fallback: Path) -> Path:
+    # если /data недоступен — пишем в api, но приложение не падает
+    return primary if _path_is_writable(primary) else fallback
 
 def _read_json_bom_safe(path: Path) -> Any:
     """
@@ -650,6 +677,10 @@ app.add_middleware(
 def startup_event():
     global CURRENT_WEEK_ID
 
+    _ensure_dir(VOTES_PATH.parent)
+    _ensure_dir(WEEK_META_PATH.parent)
+    _ensure_dir(ARCHIVE_DIR)
+
     _ensure_data_dir()
 
     # seed songs.json в volume, если его там нет
@@ -807,6 +838,91 @@ def vote_week(
         print("❌ VOTE CRASH", flush=True)
         print(traceback.format_exc(), flush=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/admin/weeks/{week_id}/archive")
+def admin_archive_week(
+    week_id: int,
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    require_admin(x_admin_token)
+    ensure_week_exists(week_id)
+
+    items = SONGS_BY_WEEK.get(week_id, []) or []
+    vmap = VOTES.get(week_id, {}) or {}
+    umap = USER_VOTES.get(week_id, {}) or {}
+
+    payload = {
+        "week_id": week_id,
+        "archived_at": datetime.now(MSK).replace(microsecond=0).isoformat(),
+        "unique_voters": len([u for u in umap.keys()]),
+        "songs": items,
+        "votes": {str(k): int(v) for k, v in vmap.items()},
+    }
+
+    out = ARCHIVE_DIR / f"week_{week_id}.json"
+    _atomic_write_json(out, payload)
+
+    return {"ok": True, "file": str(out), "week_id": week_id, "unique_voters": payload["unique_voters"]}
+
+
+class AggregateIn(BaseModel):
+    weeks: List[int] = Field(default_factory=list)
+
+@app.post("/admin/votes/aggregate")
+def admin_aggregate_votes(
+    body: AggregateIn,
+    x_admin_token: Optional[str] = Header(default=None),
+):
+    require_admin(x_admin_token)
+
+    weeks = [int(x) for x in (body.weeks or []) if int(x) > 0]
+    if not weeks:
+        raise HTTPException(status_code=400, detail="weeks is empty")
+
+    total_votes: Dict[int, int] = {}
+    song_meta: Dict[int, dict] = {}
+    total_unique_voters = 0
+
+    for wk in weeks:
+        p = ARCHIVE_DIR / f"week_{wk}.json"
+        if not p.exists():
+            raise HTTPException(status_code=404, detail=f"archive missing for week {wk}")
+
+        data = _read_json_bom_safe(p)
+        votes = data.get("votes", {}) if isinstance(data, dict) else {}
+        songs = data.get("songs", []) if isinstance(data, dict) else []
+        total_unique_voters += int(data.get("unique_voters") or 0)
+
+        # сохраняем мету песен
+        if isinstance(songs, list):
+            for s in songs:
+                if isinstance(s, dict) and s.get("id") is not None:
+                    sid = int(s["id"])
+                    song_meta.setdefault(sid, {"id": sid, "artist": s.get("artist",""), "title": s.get("title","")})
+
+        if isinstance(votes, dict):
+            for sid_str, cnt in votes.items():
+                try:
+                    sid = int(sid_str)
+                    total_votes[sid] = int(total_votes.get(sid, 0)) + int(cnt)
+                except Exception:
+                    continue
+
+    # соберём таблицу
+    rows = []
+    for sid, cnt in total_votes.items():
+        m = song_meta.get(sid, {"id": sid, "artist": "", "title": ""})
+        rows.append({**m, "votes": cnt})
+
+    rows.sort(key=lambda r: int(r.get("votes", 0)), reverse=True)
+
+    return {
+        "ok": True,
+        "weeks": weeks,
+        "unique_voters_sum": total_unique_voters,
+        "rows": rows,
+    }
 
 
 @app.post("/admin/weeks/current/voting/open")
