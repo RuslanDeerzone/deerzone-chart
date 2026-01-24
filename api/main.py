@@ -693,9 +693,6 @@ def startup_event():
 
     _ensure_data_dir()
 
-    # seed songs.json в volume, если его там нет
-    _seed_file_if_missing(SONGS_PATH, SEED_SONGS_PATH)
-
     meta = load_week_meta()
     try:
         CURRENT_WEEK_ID = int(meta.get("current_week_id") or CURRENT_WEEK_ID)
