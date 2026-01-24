@@ -1085,6 +1085,27 @@ def admin_replace_songs(
     return {"ok": True, "week_id": week_id, "count": len(norm)}
 
 
+@app.get("/__debug/votes_path")
+def debug_votes_path():
+    try:
+        exists = VOTES_PATH.exists()
+        size = VOTES_PATH.stat().st_size if exists else None
+    except Exception:
+        exists, size = False, None
+    return {"path": str(VOTES_PATH), "exists": exists, "size": size}
+
+@app.get("/__debug/votes_loaded")
+def debug_votes_loaded():
+    # покажет какие недели реально в памяти
+    weeks = sorted(list(VOTES.keys()))
+    return {
+        "weeks": weeks,
+        "current_week_id": CURRENT_WEEK_ID,
+        "votes_week_keys": sorted(list(VOTES.get(CURRENT_WEEK_ID, {}).keys()))[:10],
+        "users_count": len(USER_VOTES.get(CURRENT_WEEK_ID, {})),
+    }
+
+
 @app.post("/admin/weeks/{week_id}/rollover")
 def admin_rollover_week(
     week_id: int,
