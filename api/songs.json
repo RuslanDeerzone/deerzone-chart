@@ -85,14 +85,14 @@
     },
     {
         "id":  41,
-        "artist":  "BLASÃ",
+        "artist":  "BLASE",
         "title":  "INDUSTRY (Feat. GEMINI)",
         "is_new":  true,
         "is_current":  false,
         "weeks_in_chart":  1,
         "source":  "new",
-        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/bc/f4/9d/bcf49dda-77a1-df17-1947-73537a649987/888272123166_Cover.jpg/600x600bb.jpg",
-        "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview116/v4/1d/3e/a3/1d3ea387-ef72-3266-b2f3-a084dd553d11/mzaf_5265302383555641103.plus.aac.p.m4a",
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/48/1f/a4/481fa491-75e2-d806-34e1-525be1d4248c/8804775443992.jpg/600x600bb.jpg",
+        "preview_url":  null,
         "lock_media":  false
     },
     {
@@ -115,8 +115,8 @@
         "is_current":  false,
         "weeks_in_chart":  1,
         "source":  "new",
-        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/1f/d0/93/1fd093e7-dcd9-eff7-0b3c-858bd937bb22/093624920274.jpg/600x600bb.jpg",
-        "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/07/ea/fc/07eafc4e-a2cd-b277-108f-3d9eb72c683e/mzaf_17139503332109305159.plus.aac.p.m4a",
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/e4/5e/36/e45e36f3-f886-1258-68e1-f9367b5e2d9a/8800357999406_cover.jpg/600x600bb.jpg",
+        "preview_url":  null,
         "lock_media":  false
     },
     {
@@ -151,8 +151,8 @@
         "is_current":  false,
         "weeks_in_chart":  1,
         "source":  "new",
-        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/57/3a/6a/573a6aba-a32a-bd2b-1bf8-7f5cb04095d1/825646306053.jpg/600x600bb.jpg",
-        "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/b3/13/48/b31348e9-d33a-3c51-2f5c-81553d80066d/mzaf_5439402386688415309.plus.aac.p.m4a",
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/0f/f2/b6/0ff2b679-0f21-ba13-9d48-df472592c5c6/8809928958484_Cover.jpg/600x600bb.jpg",
+        "preview_url":  null,
         "lock_media":  false
     },
     {
@@ -175,7 +175,7 @@
         "is_current":  false,
         "weeks_in_chart":  1,
         "source":  "new",
-        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/ce/c0/8a/cec08af6-8500-cd72-97e7-0e2f49ab46ae/198704914386_Cover.jpg/600x600bb.jpg",
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/4e/48/e2/4e48e2e1-6713-c1de-db25-7a8d27f6979e/198704914287_Cover.jpg/600x600bb.webp",
         "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/d5/f7/aa/d5f7aaf2-93c4-b895-85e2-3915ceab8ecd/mzaf_13006634005929187776.plus.aac.p.m4a",
         "lock_media":  false
     },
@@ -391,7 +391,7 @@
         "is_current":  false,
         "weeks_in_chart":  1,
         "source":  "new",
-        "cover":  null,
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/f6/b0/1a/f6b01aa3-3f3f-466c-a7d9-797171dd52c7/888272174649_Cover.jpg/600x600bb.jpg",
         "preview_url":  null,
         "lock_media":  false
     },
