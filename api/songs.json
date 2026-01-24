@@ -93,7 +93,7 @@
         "source":  "new",
         "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/48/1f/a4/481fa491-75e2-d806-34e1-525be1d4248c/8804775443992.jpg/600x600bb.jpg",
         "preview_url":  null,
-        "lock_media":  false
+        "lock_media":  true
     },
     {
         "id":  49,
@@ -117,7 +117,7 @@
         "source":  "new",
         "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/e4/5e/36/e45e36f3-f886-1258-68e1-f9367b5e2d9a/8800357999406_cover.jpg/600x600bb.jpg",
         "preview_url":  null,
-        "lock_media":  false
+        "lock_media":  true
     },
     {
         "id":  44,
@@ -153,7 +153,7 @@
         "source":  "new",
         "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/0f/f2/b6/0ff2b679-0f21-ba13-9d48-df472592c5c6/8809928958484_Cover.jpg/600x600bb.jpg",
         "preview_url":  null,
-        "lock_media":  false
+        "lock_media":  true
     },
     {
         "id":  29,
@@ -393,7 +393,7 @@
         "source":  "new",
         "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/f6/b0/1a/f6b01aa3-3f3f-466c-a7d9-797171dd52c7/888272174649_Cover.jpg/600x600bb.jpg",
         "preview_url":  null,
-        "lock_media":  false
+        "lock_media":  true
     },
     {
         "id":  48,

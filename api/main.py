@@ -17,6 +17,7 @@ from typing import Any, Dict, List, Optional, Literal, Tuple
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 from urllib.parse import parse_qsl
+from difflib import SequenceMatcher
 
 import requests
 from fastapi import FastAPI, Body, Header, HTTPException
@@ -474,11 +475,22 @@ def _norm(s: Any) -> str:
     return str(s or "").strip().lower()
 
 
+def _norm(s: str) -> str:
+    s = (s or "").lower().strip()
+    s = re.sub(r"\(.*?\)", " ", s)          # убираем скобки (feat., ver.)
+    s = s.replace("feat.", " ").replace("ft.", " ")
+    s = re.sub(r"[^a-z0-9가-힣]+", " ", s)    # пунктуация -> пробел
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+def _score(artist_in: str, title_in: str, artist_it: str, title_it: str) -> float:
+    a1, t1 = _norm(artist_in), _norm(title_in)
+    a2, t2 = _norm(artist_it), _norm(title_it)
+    a = SequenceMatcher(None, a1, a2).ratio()
+    t = SequenceMatcher(None, t1, t2).ratio()
+    return 0.45 * a + 0.55 * t
+
 def itunes_search_track(artist: str, title: str) -> Optional[dict]:
-    """
-    iTunes Search API.
-    Возвращает cover + preview_url (30 сек) если найдено.
-    """
     q = f"{artist} {title}".strip()
     if not q:
         return None
@@ -503,37 +515,23 @@ def itunes_search_track(artist: str, title: str) -> Optional[dict]:
         if not results:
             return None
 
-        # Лучший матч по artist/title (не просто первый)
         best = None
-        best_score = -1
+        best_score = -1.0
+        for item in results:
+            sc = _score(artist, title, item.get("artistName",""), item.get("trackName",""))
+            if sc > best_score:
+                best_score = sc
+                best = item
 
-        a0 = _norm(artist)
-        t0 = _norm(title)
+        # порог — ниже него лучше НЕ трогать, чем поставить чужое
+        if not best or best_score < 0.78:
+            return None
 
-        for it in results:
-            a1 = _norm(it.get("artistName"))
-            t1 = _norm(it.get("trackName"))
-            score = 0
-            if a0 and a0 in a1:
-                score += 2
-            if t0 and t0 in t1:
-                score += 2
-            # небольшой бонус за точное совпадение
-            if a0 == a1:
-                score += 2
-            if t0 == t1:
-                score += 3
-            if score > best_score:
-                best_score = score
-                best = it
-
-        item = best or results[0]
-
-        cover = item.get("artworkUrl100") or item.get("artworkUrl60")
+        cover = best.get("artworkUrl100") or best.get("artworkUrl60")
         if cover:
-            cover = re.sub(r"/\d+x\d+bb\.jpg", "/600x600bb.jpg", cover)
+            cover = re.sub(r"/\d+x\d+bb\.(jpg|webp)$", "/600x600bb.\\1", cover)
 
-        preview = item.get("previewUrl")
+        preview = best.get("previewUrl")
         return {"cover": cover, "preview_url": preview}
     except Exception:
         return None
