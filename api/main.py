@@ -414,9 +414,17 @@ def require_admin(x_admin_token: Optional[str]) -> None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
-def ensure_week_exists(week_id: int) -> None:
-    if week_id != CURRENT_WEEK_ID:
-        raise HTTPException(status_code=404, detail="Week not found")
+def ensure_week_exists(week_id: int):
+    weeks = load_weeks()  # или как у тебя грузится weeks.json / state
+
+    if str(week_id) not in weeks:
+        weeks[str(week_id)] = {
+            "id": week_id,
+            "songs": [],
+            "votes": {},
+            "status": "draft"
+        }
+        save_weeks(weeks)
 
 
 def get_current_week() -> dict:
