@@ -1,6 +1,20 @@
-"5": {
-  "id": 5,
-  "songs": [],
-  "votes": {},
-  "status": "draft"
+{
+  "3": {
+    "id": 3,
+    "songs": [],
+    "votes": {},
+    "status": "archived"
+  },
+  "4": {
+    "id": 4,
+    "songs": [],
+    "votes": {},
+    "status": "archived"
+  },
+  "5": {
+    "id": 5,
+    "songs": [],
+    "votes": {},
+    "status": "draft"
+  }
 }
