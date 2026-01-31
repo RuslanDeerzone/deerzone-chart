@@ -792,14 +792,33 @@ def weeks_current():
 
 @app.get("/weeks/{week_id}/songs", response_model=List[SongOut])
 def weeks_songs(
-    week = load_week(week_id)
-    if not week or not week.get("songs"):
-        return []
     week_id: int,
     filter: Literal["all", "new", "current"] = "all",
     search: str = "",
     x_telegram_init_data: Optional[str] = Header(default=None),
 ):
+    week = load_week(week_id)
+
+    if not week or not week.get("songs"):
+        return []
+
+    songs = week["songs"]
+
+    if filter == "new":
+        songs = [s for s in songs if s.get("is_new")]
+    elif filter == "current":
+        songs = [s for s in songs if s.get("is_current")]
+
+    if search:
+        q = search.lower()
+        songs = [
+            s for s in songs
+            if q in s.get("artist", "").lower()
+            or q in s.get("title", "").lower()
+        ]
+
+    return songs
+
     # auth (в Mini App initData есть; для браузера допускаем пустое)
     try:
         if x_telegram_init_data:
