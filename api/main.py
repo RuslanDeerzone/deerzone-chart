@@ -792,6 +792,9 @@ def weeks_current():
 
 @app.get("/weeks/{week_id}/songs", response_model=List[SongOut])
 def weeks_songs(
+    week = load_week(week_id)
+    if not week or not week.get("songs"):
+        return []
     week_id: int,
     filter: Literal["all", "new", "current"] = "all",
     search: str = "",
