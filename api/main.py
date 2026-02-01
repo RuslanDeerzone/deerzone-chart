@@ -414,17 +414,20 @@ def require_admin(x_admin_token: Optional[str]) -> None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
-def ensure_week_exists(week_id: int):
-    weeks = load_weeks()  # или как у тебя грузится weeks.json / state
+def ensure_week_exists(week_id: int) -> None:
+    """
+    Минимальная гарантия структур в памяти.
+    Не трогаем weeks.json (его может не быть).
+    """
+    if not isinstance(week_id, int):
+        try:
+            week_id = int(week_id)
+        except Exception:
+            return
 
-    if str(week_id) not in weeks:
-        weeks[str(week_id)] = {
-            "id": week_id,
-            "songs": [],
-            "votes": {},
-            "status": "draft"
-        }
-        save_weeks(weeks)
+    SONGS_BY_WEEK.setdefault(week_id, [])
+    VOTES.setdefault(week_id, {})
+    USER_VOTES.setdefault(week_id, {})
 
 
 def get_current_week() -> dict:
@@ -797,7 +800,7 @@ def weeks_songs(
     search: str = "",
     x_telegram_init_data: Optional[str] = Header(default=None),
 ):
-    # auth (в Mini App initData есть; для браузера допускаем пустое)
+    # auth (если пришло — проверим; если нет — не ломаем)
     try:
         if x_telegram_init_data:
             _ = user_id_from_telegram_init_data(x_telegram_init_data)
@@ -824,10 +827,9 @@ def weeks_songs(
             if q in _norm((s or {}).get("artist")) or q in _norm((s or {}).get("title"))
         ]
 
-    # сортировка: artist A-Z, затем title A-Z
+    # сортировка
     items = items[:]
     items.sort(key=lambda s: (_norm((s or {}).get("artist")), _norm((s or {}).get("title"))))
-
     return items
 
 
