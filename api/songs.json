@@ -456,18 +456,6 @@
         "lock_media":  false
     },
     {
-        "id":  106,
-        "artist":  "YEOJIN",
-        "title":  "My Valentine",
-        "is_new":  true,
-        "is_current":  false,
-        "weeks_in_chart":  1,
-        "source":  "new",
-        "cover":  null,
-        "preview_url":  null,
-        "lock_media":  false
-    },
-    {
         "id":  79,
         "artist":  "ZEROBASEONE",
         "title":  "LOVEPOCALYPSE",
