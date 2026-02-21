@@ -247,8 +247,8 @@
         "is_current":  false,
         "weeks_in_chart":  1,
         "source":  "new",
-        "cover":  null,
-        "preview_url":  null,
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/02/d6/a0/02d6a055-4c6e-4510-6633-fe3c0fe66472/cover_KM0024211_1.jpg/600x600bb.jpg",
+        "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/7b/a6/28/7ba628c1-6d23-98ec-420b-72b291aab77b/mzaf_12833594580230925758.plus.aac.p.m4a",
         "lock_media":  false
     },
     {
@@ -343,8 +343,8 @@
         "is_current":  false,
         "weeks_in_chart":  1,
         "source":  "new",
-        "cover":  null,
-        "preview_url":  null,
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/a7/eb/9a/a7eb9a8c-160e-e411-834f-ab38d4d845a2/cover_KM0024193_1.jpg/600x600bb.jpg",
+        "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/78/72/42/787242c9-66a8-9fbd-949b-04151642434d/mzaf_9620387107460531111.plus.aac.p.m4a",
         "lock_media":  false
     },
     {
