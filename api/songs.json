@@ -67,8 +67,8 @@
         "is_current":  false,
         "weeks_in_chart":  1,
         "source":  "new",
-        "cover":  null,
-        "preview_url":  null,
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/01/2a/be/012abe3f-1fae-3d23-b3cc-adaf4cb41a47/25UM1IM74286.rgb.jpg/600x600bb.webp",
+        "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/bc/4b/a3/bc4ba39c-e167-5326-22bf-5ce777804c91/mzaf_9814013597851008302.plus.aac.p.m4a",
         "lock_media":  false
     },
     {
@@ -139,8 +139,8 @@
         "is_current":  false,
         "weeks_in_chart":  1,
         "source":  "new",
-        "cover":  null,
-        "preview_url":  null,
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/1c/fc/33/1cfc33e4-cce8-f33c-7d82-aabd20d9f00f/cover_KM0024218_1.jpg/600x600bb.webp",
+        "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/7f/57/3b/7f573bfd-c590-8f50-d6b6-3232cdc45ba0/mzaf_15219604623960418286.plus.aac.p.m4a",
         "lock_media":  false
     },
     {
@@ -247,8 +247,8 @@
         "is_current":  false,
         "weeks_in_chart":  1,
         "source":  "new",
-        "cover":  null,
-        "preview_url":  null,
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/a5/de/95/a5de954b-4e07-975b-1621-7681fd218e15/198704763106_Cover.jpg/600x600bb.jpg",
+        "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/72/dc/88/72dc8881-4ec4-6d5f-0883-f8e23d6431f5/mzaf_4419725010920307610.plus.aac.p.m4a",
         "lock_media":  false
     },
     {
@@ -355,8 +355,8 @@
         "is_current":  false,
         "weeks_in_chart":  1,
         "source":  "new",
-        "cover":  null,
-        "preview_url":  null,
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/1c/28/1e/1c281ec2-885f-244a-b29e-7e8b3dab7cb3/cover_KM0024217_1.jpg/600x600bb.webp",
+        "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/92/02/87/92028739-5564-8d28-ccd3-2b423b63deaf/mzaf_15770349313653987922.plus.aac.p.m4a",
         "lock_media":  false
     },
     {
@@ -415,8 +415,8 @@
         "is_current":  false,
         "weeks_in_chart":  1,
         "source":  "new",
-        "cover":  null,
-        "preview_url":  null,
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/d9/06/50/d9065077-13c1-93ea-cdf0-955a2bdd7877/8809928958354_Cover.jpg/600x600bb.webp",
+        "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/cf/bf/1d/cfbf1d85-3426-dcc6-e5aa-aac0eaed941f/mzaf_17162923164157896332.plus.aac.p.m4a",
         "lock_media":  false
     },
     {
@@ -432,18 +432,6 @@
         "lock_media":  false
     },
     {
-        "id":  48,
-        "artist":  "ONEUS",
-        "title":  "Grenade",
-        "is_new":  false,
-        "is_current":  true,
-        "weeks_in_chart":  6,
-        "source":  "carryover",
-        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/64/fb/56/64fb5675-f30f-94fb-cac7-91c588782a0b/cover_KM0024086_1.jpg/600x600bb.jpg",
-        "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/7f/41/7d/7f417dfb-c968-eb29-5437-f7f3f7123730/mzaf_2983581737158932745.plus.aac.p.m4a",
-        "lock_media":  false
-    },
-    {
         "id":  133,
         "artist":  "Parc Jae Jung",
         "title":  "Always (feat. Sullyoon of NMIXX)",
@@ -451,8 +439,8 @@
         "is_current":  false,
         "weeks_in_chart":  1,
         "source":  "new",
-        "cover":  null,
-        "preview_url":  null,
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/c1/39/8c/c1398c40-6491-af32-5ae0-d5fe76e393f7/cover_KM0024206_1.jpg/600x600bb.webp",
+        "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/03/ab/fd/03abfd76-518a-e6a3-8892-8de4fd656851/mzaf_17817353624752049336.plus.aac.p.m4a",
         "lock_media":  false
     },
     {
@@ -535,8 +523,8 @@
         "is_current":  false,
         "weeks_in_chart":  1,
         "source":  "new",
-        "cover":  null,
-        "preview_url":  null,
+        "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/ff/bc/9e/ffbc9e3f-3370-803e-8744-650e9fdb9c04/191953521022.jpg/600x600bb.webp",
+        "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/32/54/c7/3254c76c-d24d-4cb0-a437-d084c1352c57/mzaf_5875669369299154106.plus.aac.p.m4a",
         "lock_media":  false
     }
 ]
