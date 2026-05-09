@@ -110,7 +110,7 @@
     {
         "id":  374,
         "artist":  "CUTIE STREET",
-        "title":  "Canât We Just Be Cute (Korean Ver.)",
+        "title":  "Can't We Just Be Cute (Korean Ver.)",
         "is_new":  true,
         "is_current":  false,
         "weeks_in_chart":  1,
@@ -300,18 +300,6 @@
         "lock_media":  false
     },
     {
-        "id":  380,
-        "artist":  "LEEHI",
-        "title":  "UP",
-        "is_new":  true,
-        "is_current":  false,
-        "weeks_in_chart":  1,
-        "source":  "new",
-        "cover":  null,
-        "preview_url":  null,
-        "lock_media":  false
-    },
-    {
         "id":  261,
         "artist":  "MONSTA X",
         "title":  "heal",
@@ -393,18 +381,6 @@
         "source":  "new",
         "cover":  "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/91/76/83/917683a9-e3cf-b9c3-f502-610b480321a8/888735955181.png/600x600bb.jpg",
         "preview_url":  "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/c2/e7/88/c2e788fe-0b9b-4644-efc3-2a982697f045/mzaf_3771413958944923470.plus.aac.p.m4a",
-        "lock_media":  false
-    },
-    {
-        "id":  384,
-        "artist":  "T:EV",
-        "title":  "5AM",
-        "is_new":  true,
-        "is_current":  false,
-        "weeks_in_chart":  1,
-        "source":  "new",
-        "cover":  null,
-        "preview_url":  null,
         "lock_media":  false
     },
     {
