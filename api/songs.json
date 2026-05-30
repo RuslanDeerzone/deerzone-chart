@@ -168,18 +168,6 @@
         "lock_media":  false
     },
     {
-        "id":  451,
-        "artist":  "DROP",
-        "title":  "Wiki Wiki",
-        "is_new":  true,
-        "is_current":  false,
-        "weeks_in_chart":  1,
-        "source":  "new",
-        "cover":  null,
-        "preview_url":  null,
-        "lock_media":  false
-    },
-    {
         "id":  461,
         "artist":  "FRAME THE X",
         "title":  "NO EXIT",
