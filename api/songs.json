@@ -348,18 +348,6 @@
         "lock_media":  false
     },
     {
-        "id":  609,
-        "artist":  "NiziU",
-        "title":  "Make you happy (2026 ver.)",
-        "is_new":  true,
-        "is_current":  false,
-        "weeks_in_chart":  1,
-        "source":  "new",
-        "cover":  null,
-        "preview_url":  null,
-        "lock_media":  false
-    },
-    {
         "id":  403,
         "artist":  "NMIXX",
         "title":  "Heavy Serenade",
