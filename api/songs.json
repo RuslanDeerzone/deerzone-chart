@@ -499,8 +499,8 @@
         "is_current":  false,
         "weeks_in_chart":  1,
         "source":  "new",
-        "cover":  null,
-        "preview_url":  null,
+        "cover": "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/3b/73/50/3b735017-0cc1-e7d1-5351-53649abb4bfc/823375220206_Cover.jpg/600x600bb.jpg",
+        "preview_url": "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/38/69/11/386911db-adbe-2fce-92cd-26378294bb9f/mzaf_17498597891874964973.plus.aac.p.m4a",
         "lock_media":  false
     },
     {
